@@ -30,6 +30,32 @@
 
 
 
+
+    /* Simplify the service hero: typography first, no oversized decorative artwork */
+    .journey-hero{
+      min-height:0!important;
+      padding:clamp(30px,4vw,48px)!important;
+      display:block!important;
+      background:linear-gradient(120deg,#e8eee2 0%,#f0ecdf 58%,#f6e5db 100%)!important;
+      border:1px solid #dce4d7!important;
+      border-radius:28px!important;
+      box-shadow:none!important;
+      margin-bottom:22px!important;
+    }
+    .journey-hero:before{display:none!important}
+    .journey-art{display:none!important}
+    .journey-hero-copy{max-width:760px!important}
+    .journey-kicker-row{font-size:10px;letter-spacing:2px;margin-bottom:20px}
+    .journey-hero h1{font-size:clamp(40px,5vw,62px)!important;line-height:1.05!important;letter-spacing:-1.7px!important;max-width:740px!important;margin:0 0 16px!important}
+    .journey-hero p{font-size:16px!important;max-width:640px!important;line-height:1.75!important;margin:0 0 22px!important}
+    .journey-meta{display:flex;flex-wrap:wrap;gap:8px!important;margin-top:0!important}
+    .journey-chip{font-size:11px!important;padding:9px 13px!important;background:#ffffffa8!important;border:1px solid #ffffffc7!important}
+    @media(max-width:720px){
+      .journey-hero{padding:28px 22px!important;border-radius:22px!important}
+      .journey-hero h1{font-size:clamp(36px,9vw,48px)!important;letter-spacing:-1px!important}
+      .journey-hero p{font-size:14px!important}
+    }
+
     /* Editorial service experience */
     .journey-hero{min-height:300px;position:relative;isolation:isolate;overflow:hidden;padding:clamp(34px,5vw,66px);background:linear-gradient(115deg,#e2eadc 0%,#eee8d8 54%,#f4ded1 100%);border:1px solid #d9e2d4}
     .journey-hero:before{content:'';position:absolute;z-index:-1;width:330px;height:330px;border:1px solid #315a4525;border-radius:50%;right:-40px;top:-90px;box-shadow:0 0 0 24px #ffffff14,0 0 0 50px #ffffff12,0 0 0 80px #ffffff0d}

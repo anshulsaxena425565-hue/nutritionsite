@@ -172,6 +172,8 @@
   
     /* Rich editorial detail pages: structured content, clear hierarchy, and responsive reading */
     .journey-editorial{display:grid;gap:18px;margin:0 0 22px}
+    section.detail-intro-band,section.detail-faq-wrap,section.detail-next-step{padding:clamp(24px,4vw,40px)}
+    .detail-intro-copy{font-size:14px;line-height:1.85;color:var(--muted);margin:0}
     .detail-intro-band{display:grid;grid-template-columns:.72fr 1.28fr;gap:26px;align-items:start;padding:clamp(24px,4vw,40px);border-radius:24px;background:#fffdf8;border:1px solid var(--line)}
     .detail-intro-label{font-size:10px;letter-spacing:1.8px;text-transform:uppercase;color:#6f8a6e;font-weight:800}
     .detail-intro-band h2,.detail-section-heading{font:600 clamp(25px,3vw,34px)/1.16 'Playfair Display',serif;letter-spacing:-.6px;margin:10px 0}
@@ -199,7 +201,7 @@
     .detail-next-step h2{font:600 clamp(25px,3vw,34px)/1.15 'Playfair Display',serif;margin:0 0 9px}
     .detail-next-step p{font-size:13px;line-height:1.75;color:#e0e9de;max-width:620px;margin:0}
     .detail-next-step .btn{background:#fffdf8;color:#315a45;border-color:#fffdf8;white-space:nowrap}
-    @media(max-width:720px){.detail-intro-band,.detail-content-grid,.detail-faq-list{grid-template-columns:1fr}.detail-intro-band{gap:10px;border-radius:20px}.detail-content-card,.detail-faq-wrap{border-radius:19px}.detail-faq-head{display:block}.detail-faq-head p{margin-top:8px}.detail-next-step{align-items:flex-start;flex-direction:column;border-radius:20px}.detail-next-step .btn{white-space:normal}}
+    @media(max-width:720px){section.detail-intro-band,section.detail-faq-wrap,section.detail-next-step{padding:24px 20px}.detail-intro-band,.detail-content-grid,.detail-faq-list{grid-template-columns:1fr}.detail-intro-band{gap:10px;border-radius:20px}.detail-content-card,.detail-faq-wrap{border-radius:19px}.detail-faq-head{display:block}.detail-faq-head p{margin-top:8px}.detail-next-step{align-items:flex-start;flex-direction:column;border-radius:20px}.detail-next-step .btn{white-space:normal}}
 
   </style>
 </head>

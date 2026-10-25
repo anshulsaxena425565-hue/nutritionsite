@@ -25,7 +25,7 @@ export default async function handler(req, res) {
   }
 
   const clean = (value, max = 1000) =>
-    String(value ?? "").replace(/[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F]/g, "").trim().slice(0, max);
+    String(value ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").trim().slice(0, max);
 
   const fields = Object.entries(body)
     .filter(([key]) => !key.startsWith("_") && key !== "website")
@@ -35,7 +35,7 @@ export default async function handler(req, res) {
   const email = clean(body.email || body.Email || body.jEmail, 254);
   const name = clean(body.name || body.Name || body.jName, 120);
 
-  if (!name || !email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+  if (!name || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ success: false, message: "Please enter a valid name and email address." });
   }
 

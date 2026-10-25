@@ -24,7 +24,9 @@
     @media(max-width:640px){.wrap{width:min(100% - 32px,500px)}.nav-inner{height:68px}.menu-btn{display:block}.links{display:none;position:absolute;top:68px;left:0;right:0;padding:18px 24px 24px;background:var(--cream);border-bottom:1px solid var(--line);flex-direction:column;align-items:stretch;gap:18px}.links.open{display:flex}.links .btn{align-self:flex-start}.hero{padding:48px 0 60px}.hero-grid{grid-template-columns:1fr;gap:12px}.hero h1{font-size:53px}.hero p{font-size:14px}.hero-art{min-height:380px;order:2}.portrait-card{height:365px;width:78%}.note-one{left:0;top:35px}.note-two{right:0;bottom:32px}.leaf-one{right:5px}.leaf-two{left:0}section{padding:64px 0}.about-grid,.contact-grid{grid-template-columns:1fr}.about-art{min-height:300px;order:2}.services-grid,.steps,.credentials{grid-template-columns:1fr}.service:last-child{grid-column:auto}.section-head{margin-bottom:30px}.contact-grid{gap:25px}.form-card{padding:20px}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.footer-inner{flex-direction:column;align-items:flex-start;gap:8px}}
   
     .hero-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;}
-  </style>
+  
+     .about-photo{position:absolute;z-index:1;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 35%;}
+   </style>
 </head>
 <body>
   <header class="nav">
@@ -58,7 +60,7 @@
     </section>
     <section class="about" id="about">
       <div class="wrap about-grid">
-        <div class="about-art reveal"><div class="sun"></div><div class="plant" aria-hidden="true">🌿</div><div class="quote">“Food is more than a plan.<br>It's part of your life.”</div></div>
+        <div class="about-art reveal"><div class="sun"></div><img class="about-photo" src="./about.jpeg" alt="Prachi Sayani"><div class="quote">“Food is more than a plan.<br>It's part of your life.”</div></div>
         <div class="about-copy reveal"><span class="kicker">A little about me</span><h2>Hi, I'm Prachi.<br>Your partner in practical nutrition.</h2><p>I'm Prachi Sayani, a nutrition and dietetics professional with a foundation in Food, Nutrition & Dietetics and postgraduate study in Clinical Nutrition & Dietetics at SNDT Women's University.</p><p>I'm passionate about evidence-informed nutrition that respects real lives, food cultures, individual needs, and the fact that wellbeing is never one-size-fits-all.</p><div class="pill-list"><span class="pill">Evidence-informed practice</span><span class="pill">Clinical nutrition</span><span class="pill">Community nutrition</span><span class="pill">Food-first thinking</span></div></div>
       </div>
     </section>

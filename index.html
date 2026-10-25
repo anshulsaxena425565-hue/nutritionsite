@@ -29,6 +29,46 @@
  
 
 
+
+    /* Editorial service experience */
+    .journey-hero{min-height:300px;position:relative;isolation:isolate;overflow:hidden;padding:clamp(34px,5vw,66px);background:linear-gradient(115deg,#e2eadc 0%,#eee8d8 54%,#f4ded1 100%);border:1px solid #d9e2d4}
+    .journey-hero:before{content:'';position:absolute;z-index:-1;width:330px;height:330px;border:1px solid #315a4525;border-radius:50%;right:-40px;top:-90px;box-shadow:0 0 0 24px #ffffff14,0 0 0 50px #ffffff12,0 0 0 80px #ffffff0d}
+    .journey-art{position:absolute;right:7%;bottom:18px;width:190px;height:190px;display:grid;place-items:center;pointer-events:none;opacity:.72}
+    .journey-art svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 15px 14px #3b58401a)}
+    .journey-hero-copy{max-width:680px;position:relative;z-index:2}
+    .journey-hero h1{max-width:650px;font-size:clamp(42px,5.5vw,66px);letter-spacing:-1.8px;line-height:1.02}
+    .journey-hero p{max-width:560px;line-height:1.85}
+    .journey-kicker-row{display:flex;align-items:center;gap:10px;font-size:10px;letter-spacing:2px;font-weight:800;color:#52725c}
+    .journey-kicker-row:before{content:'';width:24px;height:1px;background:#52725c}
+    .journey-progress{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:0 0 24px}
+    .journey-progress-step{border:0;background:transparent;padding:0;text-align:left;cursor:default}
+    .journey-progress-track{height:4px;border-radius:99px;background:#e9ece4;margin-bottom:9px;overflow:hidden}
+    .journey-progress-track span{display:block;width:0;height:100%;border-radius:99px;background:#315a45;transition:width .35s ease}
+    .journey-progress-step.active .journey-progress-track span,.journey-progress-step.done .journey-progress-track span{width:100%}
+    .journey-progress-step strong{display:block;font-size:10px;color:#a0a69b;letter-spacing:.5px}
+    .journey-progress-step.active strong,.journey-progress-step.done strong{color:#315a45}
+    .journey-form-step{display:none;animation:journeyIn .25s ease both}
+    .journey-form-step.active{display:grid}
+    .journey-step-heading{font:600 27px/1.2 'Playfair Display',serif;margin:0 0 8px}
+    .journey-step-sub{font-size:12px!important;margin:0 0 19px!important;line-height:1.65}
+    .journey-review{display:grid;gap:0;border:1px solid #e3e8df;border-radius:16px;overflow:hidden;margin:16px 0 5px}
+    .journey-review-row{display:grid;grid-template-columns:125px 1fr;gap:12px;padding:13px 15px;border-bottom:1px solid #edf0e9;font-size:12px}
+    .journey-review-row:last-child{border-bottom:0}.journey-review-row span{color:#7d887d}.journey-review-row strong{font-weight:600;overflow-wrap:anywhere}
+    .journey-edit{border:0;background:transparent;color:var(--green);font:700 12px 'DM Sans',sans-serif;text-decoration:underline;cursor:pointer;padding:8px 0}
+    .journey-back-step{background:transparent;border:1px solid #dce4d7;color:var(--green);border-radius:99px;padding:12px 18px;font:700 12px 'DM Sans',sans-serif;cursor:pointer}
+    .journey-form-step .journey-privacy{margin-top:8px}
+    .journey .journey-actions{align-items:center}
+    .journey .journey-actions .btn{cursor:pointer}
+    .journey-summary{border:1px solid #e1e8dd}
+    @media(max-width:720px){
+      .journey-hero{min-height:unset;padding:30px 23px 112px}
+      .journey-art{width:112px;height:112px;right:14px;bottom:2px;opacity:.55}
+      .journey-hero h1{font-size:clamp(38px,10vw,50px);max-width:100%}
+      .journey-review-row{grid-template-columns:95px 1fr;padding:12px}
+      .journey-step-heading{font-size:24px}
+    }
+    @media(prefers-reduced-motion:reduce){.journey-hero,.journey-form-step,.journey-progress-track span{animation:none!important;transition:none!important}}
+
     /* Header must sit above the service content, never on top of its title */
     .journey-top{position:fixed!important;top:0;left:0;right:0;width:100%;z-index:120;min-height:68px;background:rgba(247,246,239,.97);box-shadow:0 8px 28px #21352b0a}
     .journey-body{padding-top:108px!important}
@@ -223,22 +263,24 @@
     <div class="journey-top"><div class="wrap journey-top-inner"><button class="journey-back" id="journeyBack" type="button">← Back to packages</button><a class="journey-brand" href="#home">prachi sayani<span style="color:#6c8c6d">.</span></a><span class="journey-chip">Your nutrition journey</span></div></div>
     <div class="journey-body">
       <div id="journeyDetails">
-        <div class="journey-hero"><span class="kicker" id="journeyKicker">PERSONALISED SUPPORT</span><h1 id="journeyTitle">Find the support that fits you.</h1><p id="journeyIntro"></p><div class="journey-meta" id="journeyMeta"></div></div>
+        <div class="journey-hero"><div class="journey-hero-copy"><div class="journey-kicker-row" id="journeyKicker">PERSONALISED SUPPORT</div><h1 id="journeyTitle">Find the support that fits you.</h1><p id="journeyIntro"></p><div class="journey-meta" id="journeyMeta"></div></div><div class="journey-art" id="journeyArt" aria-hidden="true"></div></div>
         <div class="journey-grid">
           <article class="journey-panel"><h2>What this can look like</h2><p id="journeyDescription"></p><ul class="journey-list" id="journeyIncludes"></ul><h3 style="font:600 21px 'Playfair Display',serif;margin:25px 0 8px">How it works</h3><p id="journeyHow"></p><p style="font-size:11px;color:var(--muted)">Every enquiry is reviewed for suitability. Individual clinical assessment, diagnosis, or treatment may need an appropriately qualified healthcare professional.</p></article>
-          <article class="journey-panel"><div class="journey-steps"><div class="journey-step active">01 · YOUR DETAILS</div><div class="journey-step">02 · REVIEW</div><div class="journey-step">03 · NEXT STEPS</div></div><h2>Let's make it personal.</h2><p>Share a few details so Prachi can understand what you're looking for. You can leave optional questions blank.</p>
+          <article class="journey-panel"><div class="journey-progress" id="journeyProgress" aria-label="Enquiry progress"><div class="journey-progress-step active"><div class="journey-progress-track"><span></span></div><strong>01 · YOUR DETAILS</strong></div><div class="journey-progress-step"><div class="journey-progress-track"><span></span></div><strong>02 · YOUR GOALS</strong></div><div class="journey-progress-step"><div class="journey-progress-track"><span></span></div><strong>03 · REVIEW</strong></div></div><h2>Let's make it personal.</h2><p>Just a few thoughtful details, so the next step feels right for you.</p>
             <form id="journeyForm"><input type="hidden" name="_subject" id="journeySubject" value="New service enquiry"><input type="hidden" name="service" id="journeyServiceName"><input type="hidden" name="package" id="journeyPackageName"><input type="text" name="_honey" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px">
-              <div class="journey-form">
+              <div class="journey-form-step active" data-form-step="0"><h3 class="journey-step-heading">First, how can we reach you?</h3><p class="journey-step-sub">Your details are used to respond to this enquiry.</p><div class="journey-form">
                 <div class="journey-field"><label for="jName">Your name *</label><input id="jName" name="name" autocomplete="name" required placeholder="Your name"></div>
                 <div class="journey-field"><label for="jEmail">Email address *</label><input id="jEmail" name="email" type="email" autocomplete="email" required placeholder="you@example.com"></div>
                 <div class="journey-field"><label for="jPhone">Phone / WhatsApp *</label><input id="jPhone" name="phone" type="tel" autocomplete="tel" required placeholder="+91…" minlength="7" maxlength="20"></div>
                 <div class="journey-field"><label for="jFormat">Preferred contact</label><select id="jFormat" name="preferred_contact"><option>Email</option><option>WhatsApp / phone</option></select></div>
+              </div></div>
+              <div class="journey-form-step" data-form-step="1"><h3 class="journey-step-heading">What would support look like?</h3><p class="journey-step-sub">Choose what fits best today — it's okay if you're still figuring it out.</p><div class="journey-form">
                 <div class="journey-field"><label for="jGoal">Main goal *</label><select id="jGoal" name="main_goal" required><option value="" disabled selected>Choose what fits best</option><option>Build balanced eating habits</option><option>Weight management</option><option>Meal planning / food organisation</option><option>Digestive wellbeing education</option><option>Understand nutrition for a health concern</option><option>Family nutrition</option><option>General nutrition questions</option><option>Other / not sure yet</option></select></div>
                 <div class="journey-field"><label for="jTimeline">When would you like to start?</label><select id="jTimeline" name="preferred_start"><option>As soon as possible</option><option>Within 2–4 weeks</option><option>Just exploring</option></select></div>
                 <div class="journey-field full"><label for="jContext">Anything that would help us understand your needs? (optional)</label><textarea id="jContext" name="context" placeholder="Your routine, food preferences, what support you're hoping for… Please don't include detailed medical or sensitive information here."></textarea></div>
-                <label class="journey-privacy"><input type="checkbox" name="consent_to_contact" value="Yes" required> I agree to be contacted about this enquiry and understand this form is not for urgent medical care.</label>
-              </div>
-              <div class="journey-actions"><button class="btn" type="submit" id="journeySubmit">Send my enquiry ↗</button><button class="btn outline" type="button" id="journeyCancel">Not right now</button></div><p class="journey-status" id="journeyStatus" role="status" aria-live="polite"></p>
+              </div></div>
+              <div class="journey-form-step" data-form-step="2"><h3 class="journey-step-heading">A quick review before we send.</h3><p class="journey-step-sub">Check your details below. No payment is taken at this stage.</p><div class="journey-review" id="journeyReview"></div><button type="button" class="journey-edit" id="journeyEdit">← Edit my details</button><label class="journey-privacy"><input type="checkbox" id="jConsent" name="consent_to_contact" value="Yes" required> I agree to be contacted about this enquiry and understand this form is not for urgent medical care.</label></div>
+              <div class="journey-actions"><button class="btn" type="button" id="journeyNext">Continue ↗</button><button class="btn" type="submit" id="journeySubmit" style="display:none">Send my enquiry ↗</button><button class="journey-back-step" type="button" id="journeyPrev" style="display:none">← Back</button><button class="btn outline" type="button" id="journeyCancel">Not right now</button></div><p class="journey-status" id="journeyStatus" role="status" aria-live="polite"></p>
             </form>
           </article>
         </div>

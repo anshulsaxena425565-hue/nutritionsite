@@ -17,11 +17,11 @@ function App(){const[user,U]=useState(null),[loading,L]=useState(true),[page,P]=
 const memberships=user?.memberships||[],admin=!!user?.is_platform_admin,dietitian=memberships.some(m=>m.role==='dietitian'),dietitianApplicant=(user?.account_type||user?.registration_intent)==='dietitian',msg=(text,error=false)=>N({text,error});
 async function me(){try{const d=await api('/auth/me');U(d.user)}catch{U(null)}finally{L(false)}}useEffect(()=>{me()},[]);
 async function loadPublic(){try{const d=await api('/practices/public');PP(d.practices||[]);if((d.practices||[]).length===1)F(p=>({...p,practice_id:p.practice_id||d.practices[0].id}))}catch(e){msg(e.message,true)}}
-async function loadDirectory(f=filters){if(!f.practice_id){D([]);return}try{const d=await api('/dietitians/directory?'+new URLSearchParams({...f,max_fee:f.max_fee||'0'}));D(d.dietitians||[])}catch(e){msg(e.message,true)}}
+async function loadDirectory(f=filters){try{const params={...f,max_fee:f.max_fee||'0'};Object.keys(params).forEach(k=>{if(params[k]===''||params[k]==null)delete params[k]});const d=await api('/dietitians/directory?'+new URLSearchParams(params));D(d.dietitians||[])}catch(e){msg(e.message,true)}}
 async function loadRequests(){try{const d=await api('/dietitian/requests');Q(d.requests||[])}catch(e){msg(e.message,true)}}
 async function loadAdmin(){if(!admin)return;try{const[a,b,c]=await Promise.all([api('/admin/practices'),api('/admin/dietitians'),api('/admin/applicants')]);PS(a.practices||[]);DT(b.dietitians||[]);AP(c.applicants||[])}catch(e){msg(e.message,true)}}
 async function refresh(){R(true);await Promise.all([loadPublic(),loadRequests(),loadAdmin()]);R(false)}
-useEffect(()=>{if(user){loadPublic();loadRequests();loadAdmin()}},[user?.id,user?.is_platform_admin]);useEffect(()=>{if(user&&filters.practice_id)loadDirectory(filters)},[filters.practice_id]);
+useEffect(()=>{if(user){loadPublic();loadRequests();loadAdmin();loadDirectory(filters)}},[user?.id,user?.is_platform_admin]);useEffect(()=>{if(user)loadDirectory(filters)},[filters.practice_id]);
 async function logout(){try{await api('/auth/logout',{method:'POST',body:'{}'})}catch{}U(null);P('Overview');N(null)}
 async function createPractice(e){e.preventDefault();try{await api('/admin/practices',{method:'POST',body:JSON.stringify(practiceForm)});CF({name:'',slug:''});msg('Practice created in pending status.');loadAdmin()}catch(e){msg(e.message,true)}}
 async function statusPractice(id,status){try{await api('/admin/practices/'+id+'/status',{method:'POST',body:JSON.stringify({status})});msg('Practice status updated.');loadAdmin()}catch(e){msg(e.message,true)}}

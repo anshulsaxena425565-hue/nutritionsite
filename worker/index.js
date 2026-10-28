@@ -20,6 +20,24 @@ async function sendOtp(env, to, code) {
   const r = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject: "Your secure sign-in code", text: `Your sign-in code is ${code}. It expires in 10 minutes. If you did not request this, you can ignore this email.`, html: `<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px"><h2>Sign in securely</h2><p>Your one-time code is:</p><p style="font-size:32px;font-weight:700;letter-spacing:8px">${code}</p><p>This code expires in 10 minutes. Never share it with anyone.</p></div>` }) });
   if (!r.ok) throw new Error("email_send_failed");
 }
+async function passwordHash(password, saltHex) {
+  const salt = saltHex ? Uint8Array.from(saltHex.match(/.{2}/g).map(x=>parseInt(x,16))) : crypto.getRandomValues(new Uint8Array(16));
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations:120000,hash:"SHA-256"},key,256);
+  return hex(salt)+":"+hex(bits);
+}
+async function passwordMatches(password, stored) {
+  if(!stored || !stored.includes(":")) return false;
+  const [salt, expected] = stored.split(":");
+  return expected === (await passwordHash(password,salt)).split(":")[1];
+}
+function validPassword(p){return typeof p==="string" && p.length>=10 && p.length<=128 && /[A-Za-z]/.test(p) && /[0-9]/.test(p);}
+function createSessionCookie(raw){return cookie("pn_session",raw,7*24*60*60);}
+async function establishSession(env,userId,headers){
+  const raw=randomToken(32), expires=new Date(Date.now()+7*24*60*60*1000).toISOString();
+  await env.DB.prepare("INSERT INTO auth_sessions(id,user_id,token_hash,expires_at,last_seen_at) VALUES(?,?,?,?,?)").bind(id(),userId,await hash(raw),expires,now()).run();
+  return {...headers,"Set-Cookie":createSessionCookie(raw)};
+}
 async function getSession(request, env) {
   const raw = (request.headers.get("Cookie") || "").split(";").map(s => s.trim()).find(s => s.startsWith("pn_session="))?.slice("pn_session=".length);
   if (!raw) return null;
@@ -49,6 +67,26 @@ export default {
     const ref=id();
     await env.DB.prepare("INSERT INTO enquiries(id,name,email,phone,service,preferred_contact,goal,preferred_start,message,status,source) VALUES(?,?,?,?,?,?,?,?,?,'new',?)").bind(ref,name,email,clean(b.phone||b.jPhone,40),clean(b.service||b.service_name||b.journeyServiceName,160),clean(b.preferred_contact||b.jFormat,40),clean(b.goal||b.jGoal,1000),clean(b.preferred_start||b.jTimeline,120),clean(b.message||b.jContext,3000),"website").run();
     return json({success:true,message:"Thank you. Your enquiry has been received.",reference:ref},200,headers);
+   }
+   if (path === "/auth/register" && request.method === "POST") {
+    const b=await body(request),name=clean(b.full_name,120),email=clean(b.email,254).toLowerCase(),phone=clean(b.mobile,24).replace(/[\\s()+.-]/g,""),password=b.password;
+    if(name.length<2||!emailOk(email)||!/^[0-9]{7,15}$/.test(phone)||!validPassword(password))
+      return json({success:false,message:"Enter your name, a valid email, mobile number and a password of at least 10 characters containing letters and numbers."},400,headers);
+    const existing=await env.DB.prepare("SELECT id FROM app_users WHERE email=? COLLATE NOCASE OR phone=? LIMIT 1").bind(email,phone).first();
+    if(existing)return json({success:false,message:"An account already exists for that email or mobile. Sign in instead, or use account recovery."},409,headers);
+    const userId=id(),stored=await passwordHash(password);
+    await env.DB.prepare("INSERT INTO app_users(id,email,display_name,phone,password_hash,status) VALUES(?,?,?,?,?,'active')").bind(userId,email,name,phone,stored).run();
+    const sessionHeaders=await establishSession(env,userId,headers);
+    await audit(env,userId,null,"auth.register","user",userId);
+    return json({success:true,message:"Account created.",user:{id:userId,email,display_name:name}},201,sessionHeaders);
+   }
+   if (path === "/auth/login" && request.method === "POST") {
+    const b=await body(request),identifier=clean(b.identifier,254).toLowerCase(),password=b.password;
+    if(!identifier||typeof password!=="string"||password.length>128)return json({success:false,message:"Enter your email/mobile and password."},400,headers);
+    const user=await env.DB.prepare("SELECT id,email,display_name,status,password_hash FROM app_users WHERE (email=? COLLATE NOCASE OR phone=?) LIMIT 1").bind(identifier,identifier.replace(/[\\s()+.-]/g,"")).first();
+    if(!user||user.status!=="active"||!(await passwordMatches(password,user.password_hash)))return json({success:false,message:"Email/mobile or password is incorrect."},401,headers);
+    const sessionHeaders=await establishSession(env,user.id,headers);
+    return json({success:true,message:"Signed in.",user:{id:user.id,email:user.email,display_name:user.display_name}},200,sessionHeaders);
    }
    if (path === "/auth/request-code" && request.method === "POST") {
     const b=await body(request), email=clean(b.email,254).toLowerCase();

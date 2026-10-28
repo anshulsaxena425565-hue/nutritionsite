@@ -80,7 +80,23 @@ $('showLogin').addEventListener('click',()=>setAuthMode('login'));
 $('showRegister').addEventListener('click',()=>setAuthMode('register'));
 $('passwordRegister').addEventListener('submit',async e=>{e.preventDefault();if($('registerPassword').value!==$('registerPasswordConfirm').value){showStatus('loginStatus','Passwords do not match.',true);return} $('registerBtn').disabled=true;try{const d=await call('/auth/register',{method:'POST',body:JSON.stringify({full_name:$('registerName').value.trim(),email:$('registerEmail').value.trim(),mobile:$('registerMobile').value.trim(),password:$('registerPassword').value})});currentUser={...d.user,is_platform_admin:false,memberships:[]};showApp()}catch(err){showStatus('loginStatus',err.message,true)}finally{$('registerBtn').disabled=false}});
 $('passwordLogin').addEventListener('submit',async e=>{e.preventDefault();$('loginBtn').disabled=true;try{const d=await call('/auth/login',{method:'POST',body:JSON.stringify({identifier:$('loginIdentifier').value.trim(),password:$('loginPassword').value})});const me=await call('/auth/me');currentUser=me.user;showApp()}catch(err){showStatus('loginStatus',err.message,true)}finally{$('loginBtn').disabled=false}});
-function showApp(){$('loginCard').classList.add('hidden');$('app').classList.remove('hidden');$('logout').classList.remove('hidden');$('welcome').textContent='Signed in as '+currentUser.display_name+' ('+currentUser.email+').';$('roleStat').textContent=currentUser.is_platform_admin?'Super Admin':([...new Set(currentUser.memberships.map(m=>m.role))].join(', ')||'Member');$('practiceCount').textContent=currentUser.memberships.length;$('adminArea').classList.toggle('hidden',!currentUser.is_platform_admin);$('memberArea').classList.toggle('hidden',currentUser.is_platform_admin);if(currentUser.is_platform_admin)loadPractices();else loadMemberships()}
+function showApp(){
+ $('loginCard').classList.add('hidden');$('app').classList.remove('hidden');$('logout').classList.remove('hidden');
+ $('welcome').textContent='Signed in as '+currentUser.display_name+' ('+currentUser.email+').';
+ $('roleStat').textContent=currentUser.is_platform_admin?'Super Admin':([...new Set(currentUser.memberships.map(m=>m.role))].join(', ')||'Member');
+ $('practiceCount').textContent=currentUser.memberships.length;
+ $('adminArea').classList.toggle('hidden',!currentUser.is_platform_admin);
+ $('memberArea').classList.toggle('hidden',currentUser.is_platform_admin);
+ $('clientDirectoryArea').classList.remove('hidden');
+ const isDietitian=currentUser.memberships.some(m=>m.role==='dietitian'||m.role==='owner'||m.role==='admin');
+ $('dietitianArea').classList.toggle('hidden',!isDietitian);
+ $('superDietitianArea').classList.toggle('hidden',!currentUser.is_platform_admin);
+ if(currentUser.is_platform_admin){loadPractices();loadDietitianAdmin()}
+ else loadMemberships();
+ loadPublicPractices();
+ if(isDietitian)loadDietitianPractices();
+ loadRequests();
+}$('loginCard').classList.add('hidden');$('app').classList.remove('hidden');$('logout').classList.remove('hidden');$('welcome').textContent='Signed in as '+currentUser.display_name+' ('+currentUser.email+').';$('roleStat').textContent=currentUser.is_platform_admin?'Super Admin':([...new Set(currentUser.memberships.map(m=>m.role))].join(', ')||'Member');$('practiceCount').textContent=currentUser.memberships.length;$('adminArea').classList.toggle('hidden',!currentUser.is_platform_admin);$('memberArea').classList.toggle('hidden',currentUser.is_platform_admin);if(currentUser.is_platform_admin)loadPractices();else loadMemberships()}
 $('requestForm')?.addEventListener('submit',async e=>{e.preventDefault();$('requestBtn').disabled=true;try{await call('/auth/request-code',{method:'POST',body:JSON.stringify({email:$('email').value.trim()})});$('verifyForm').classList.remove('hidden');$('requestForm').classList.add('hidden');showStatus('loginStatus','If this email is eligible, a sign-in code will arrive shortly.')}catch(err){showStatus('loginStatus',err.message,true)}finally{$('requestBtn').disabled=false}});
 $('verifyForm')?.addEventListener('submit',async e=>{e.preventDefault();$('verifyBtn').disabled=true;try{await call('/auth/verify-code',{method:'POST',body:JSON.stringify({email:$('email').value.trim(),code:$('code').value.trim()})});const data=await call('/auth/me');currentUser=data.user;showApp()}catch(err){showStatus('loginStatus',err.message,true)}finally{$('verifyBtn').disabled=false}});
 $('backBtn')?.addEventListener('click',()=>{$('verifyForm').classList.add('hidden');$('requestForm').classList.remove('hidden');$('code').value='';showStatus('loginStatus','')});
@@ -91,5 +107,64 @@ $('createPractice').addEventListener('submit',async e=>{e.preventDefault();try{a
 $('refresh').addEventListener('click',loadPractices);
 $('inviteForm').addEventListener('submit',async e=>{e.preventDefault();try{const d=await call('/practice/invitations',{method:'POST',body:JSON.stringify({practice_id:$('invitePractice').value,email:$('inviteEmail').value.trim(),role:$('inviteRole').value})});showStatus('inviteStatus',d.message||'Invitation sent.');$('inviteForm').reset()}catch(err){showStatus('inviteStatus',err.message,true)}});
 async function loadMemberships(){$('membershipBody').innerHTML=currentUser.memberships.map(m=>'<tr><td>'+escapeHtml(m.practice_name)+'</td><td>'+escapeHtml(m.role)+'</td><td>'+escapeHtml(m.practice_status)+'</td><td><button class="btn alt" data-members="'+escapeHtml(m.practice_id)+'">View members</button></td></tr>').join('')||'<tr><td colspan="4">No practice memberships yet. Ask a practice owner for an invitation.</td></tr>';$('membershipBody').querySelectorAll('[data-members]').forEach(btn=>btn.addEventListener('click',async()=>{try{const d=await call('/practice/members?practice_id='+encodeURIComponent(btn.dataset.members));showStatus('membersStatus','Loaded '+d.members.length+' member(s).');alert(d.members.map(m=>m.display_name+' — '+m.role+' ('+m.email+')').join('\n')||'No members yet.')}catch(err){showStatus('membersStatus',err.message,true)}}))}
+
+async function loadPublicPractices(){
+ try{
+  const d=await call('/practices/public');
+  const options='<option value="">Choose a practice</option>'+(d.practices||[]).map(p=>'<option value="'+escapeHtml(p.id)+'">'+escapeHtml(p.name)+'</option>').join('');
+  $('directoryPractice').innerHTML=options;
+  const oldVal=$('dietitianPractice').value;
+  $('dietitianPractice').innerHTML='<option value="">Choose your practice</option>'+currentUser.memberships.filter(m=>['dietitian','owner','admin'].includes(m.role)).map(m=>'<option value="'+escapeHtml(m.practice_id)+'">'+escapeHtml(m.practice_name)+'</option>').join('');
+  if(oldVal)$('dietitianPractice').value=oldVal;
+  if(d.practices?.length===1)$('directoryPractice').value=d.practices[0].id;
+  if(d.practices?.length)await loadDirectory();
+  else $('directoryStatus').textContent='No active practices are available yet.';
+ }catch(err){showStatus('directoryStatus',err.message,true)}
+}
+async function loadDirectory(){
+ const practiceId=$('directoryPractice').value;
+ if(!practiceId){$('dietitianDirectory').innerHTML='';$('directoryStatus').textContent='Choose a practice to view verified dietitians.';return}
+ const params=new URLSearchParams({practice_id:practiceId,specialty:$('filterSpecialty').value.trim(),language:$('filterLanguage').value.trim(),mode:$('filterMode').value,min_experience:$('filterExperience').value,max_fee:$('filterFee').value||'0',gender:$('filterGender').value,sort:$('directorySort').value});
+ try{
+  const d=await call('/dietitians/directory?'+params.toString());
+  $('directoryStatus').textContent=(d.dietitians||[]).length+' verified dietitian(s) found.';
+  $('dietitianDirectory').innerHTML=(d.dietitians||[]).map(x=>'<article class="dietitian-card"><span class="badge">Verified</span><h3 style="margin-top:10px">'+escapeHtml(x.display_name)+'</h3><p class="muted">'+escapeHtml(x.credentials||'Nutrition professional')+' · '+Number(x.experience_years||0)+' years experience</p><p>'+escapeHtml(x.specialties.join(', ')||'General nutrition')+'</p><p class="muted">Languages: '+escapeHtml(x.languages.join(', ')||'Not specified')+'<br>Mode: '+escapeHtml(x.consultation_modes.join(', '))+'<br>Consultation fee: ₹'+(Number(x.fee_minor||0)/100).toLocaleString('en-IN')+'</p><p>'+escapeHtml(x.bio||'Professional profile details available on request.')+'</p><button class="btn" data-request="'+escapeHtml(x.user_id)+'">Request consultation</button></article>').join('')||'<div class="notice">No verified dietitians match these filters yet. Try broadening your search or check again later.</div>';
+  $('dietitianDirectory').querySelectorAll('[data-request]').forEach(btn=>btn.addEventListener('click',async()=>{const message=prompt('Optional: What would you like the dietitian to know? (Do not enter sensitive medical details here)')||'';btn.disabled=true;try{const result=await call('/dietitian/requests',{method:'POST',body:JSON.stringify({practice_id:practiceId,dietitian_user_id:btn.dataset.request,message})});showStatus('directoryStatus',result.message);await loadRequests()}catch(err){showStatus('directoryStatus',err.message,true)}finally{btn.disabled=false}}));
+ }catch(err){showStatus('directoryStatus',err.message,true);$('dietitianDirectory').innerHTML=''}
+}
+async function loadRequests(){
+ try{
+  const d=await call('/dietitian/requests');
+  const rows=d.requests||[];
+  const clients=rows.filter(r=>r.client_user_id===currentUser.id);
+  $('clientRequests').innerHTML='<table><thead><tr><th>Practice</th><th>Dietitian</th><th>Message</th><th>Status</th></tr></thead><tbody>'+(clients.map(r=>'<tr><td>'+escapeHtml(r.practice_name)+'</td><td>'+escapeHtml(r.dietitian_name)+'</td><td>'+escapeHtml(r.message||'—')+'</td><td><span class="badge '+escapeHtml(r.status)+'">'+escapeHtml(r.status)+'</span></td></tr>').join('')||'<tr><td colspan="4">No consultation requests yet.</td></tr>')+'</tbody></table>';
+  const mine=rows.filter(r=>r.dietitian_user_id===currentUser.id);
+  $('dietitianRequests').innerHTML='<table><thead><tr><th>Client</th><th>Practice</th><th>Message</th><th>Status</th><th>Action</th></tr></thead><tbody>'+(mine.map(r=>'<tr><td>'+escapeHtml(r.client_name)+'<br><small>'+escapeHtml(r.client_email)+'</small></td><td>'+escapeHtml(r.practice_name)+'</td><td>'+escapeHtml(r.message||'—')+'</td><td>'+escapeHtml(r.status)+'</td><td>'+(r.status==='pending'?'<button class="btn" data-decision="'+escapeHtml(r.id)+'" data-value="accepted">Accept</button> <button class="btn alt" data-decision="'+escapeHtml(r.id)+'" data-value="declined">Decline</button>':'—')+'</td></tr>').join('')||'<tr><td colspan="5">No consultation requests yet.</td></tr>')+'</tbody></table>';
+  $('dietitianRequests').querySelectorAll('[data-decision]').forEach(btn=>btn.addEventListener('click',async()=>{btn.disabled=true;try{await call('/dietitian/requests/'+btn.dataset.decision+'/decision',{method:'POST',body:JSON.stringify({status:btn.dataset.value})});showStatus('dietitianRequestStatus','Request '+btn.dataset.value+'.');await loadRequests()}catch(err){showStatus('dietitianRequestStatus',err.message,true)}finally{btn.disabled=false}}));
+ }catch(err){showStatus('dietitianRequestStatus',err.message,true)}
+}
+async function loadDietitianPractices(){
+ const eligible=currentUser.memberships.filter(m=>['dietitian','owner','admin'].includes(m.role));
+ $('dietitianPractice').innerHTML='<option value="">Choose your practice</option>'+eligible.map(m=>'<option value="'+escapeHtml(m.practice_id)+'">'+escapeHtml(m.practice_name)+'</option>').join('');
+}
+$('applyFilters').addEventListener('click',loadDirectory);
+$('refreshDirectory').addEventListener('click',loadDirectory);
+$('directoryPractice').addEventListener('change',loadDirectory);
+$('clearFilters').addEventListener('click',()=>{$('filterSpecialty').value='';$('filterLanguage').value='';$('filterMode').value='';$('filterExperience').value='0';$('filterFee').value='';$('filterGender').value='';$('directorySort').value='name';loadDirectory()});
+$('dietitianProfileForm').addEventListener('submit',async e=>{
+ e.preventDefault();
+ const practiceId=$('dietitianPractice').value;
+ const specialties=$('dietitianSpecialties').value.split(',').map(x=>x.trim()).filter(Boolean);
+ const languages=$('dietitianLanguages').value.split(',').map(x=>x.trim()).filter(Boolean);
+ const consultation_modes=[...$('dietitianModes').selectedOptions].map(x=>x.value);
+ try{const d=await call('/dietitian/profile',{method:'POST',body:JSON.stringify({practice_id:practiceId,credentials:$('dietitianCredentials').value,registration_number:$('dietitianRegistration').value,bio:$('dietitianBio').value,specialties,languages,consultation_modes,gender:$('dietitianGender').value,experience_years:Number($('dietitianExperience').value),fee_rupees:Number($('dietitianFee').value),accepting_clients:$('dietitianAccepting').checked})});showStatus('dietitianProfileStatus',d.message); }catch(err){showStatus('dietitianProfileStatus',err.message,true)}
+});
+async function loadDietitianAdmin(){
+ try{const d=await call('/admin/dietitians');$('superDietitianBody').innerHTML=(d.dietitians||[]).map(x=>'<tr><td>'+escapeHtml(x.display_name)+'<br><small>'+escapeHtml(x.email)+'</small></td><td>'+escapeHtml(x.practice_name)+'</td><td>'+escapeHtml(x.credentials||'—')+'</td><td>'+escapeHtml(x.registration_number||'—')+'</td><td>'+Number(x.experience_years||0)+' years</td><td><span class="badge">'+escapeHtml(x.verification_status)+'</span></td><td><select data-verify="'+escapeHtml(x.user_id)+'" data-practice="'+escapeHtml(x.practice_id)+'"><option value="">Change…</option><option value="verified">Verify</option><option value="rejected">Reject</option><option value="pending">Pending</option><option value="expired">Expired</option></select></td></tr>').join('')||'<tr><td colspan="7">No dietitian profiles submitted yet.</td></tr>';
+ $('superDietitianBody').querySelectorAll('[data-verify]').forEach(sel=>sel.addEventListener('change',async()=>{if(!sel.value)return;try{await call('/admin/dietitians/'+sel.dataset.verify+'/verification',{method:'POST',body:JSON.stringify({practice_id:sel.dataset.practice,status:sel.value})});showStatus('superDietitianStatus','Verification status updated.');await loadDietitianAdmin()}catch(err){showStatus('superDietitianStatus',err.message,true)}}));
+ }catch(err){showStatus('superDietitianStatus',err.message,true)}
+}
+$('refreshDietitianAdmin').addEventListener('click',loadDietitianAdmin);
+
 boot();
 </script></body></html>

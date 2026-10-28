@@ -209,6 +209,7 @@ export default {
    }
    return json({success:false,message:"Not found."},404,headers);
   } catch (e) {
+   console.error("API request failed", { path, message: String(e?.message || e), stack: String(e?.stack || "").slice(0,1200) });
    if(e?.message==="too_large") return json({success:false,message:"Request too large."},413,headers);
    if(e instanceof SyntaxError) return json({success:false,message:"Invalid JSON."},400,headers);
    return json({success:false,message:"The service encountered an error. Please try again later."},500,headers);

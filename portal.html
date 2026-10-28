@@ -23,7 +23,7 @@
 </section>
 </main>
 <script>
-const API='https://prachi-nutrition-api.prachisayani-api.workers.dev';
+const API='/api/platform';
 const $=id=>document.getElementById(id);
 let currentUser=null,practices=[];
 async function call(path,options={}){const r=await fetch(API+path,{...options,credentials:'include',headers:{'Content-Type':'application/json',...(options.headers||{})}});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.message||'Request failed ('+r.status+')');return data}

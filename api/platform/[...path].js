@@ -2,13 +2,16 @@ import proxy from "../../lib/platform-proxy.js";
 
 const ROUTES = new Set([
   "practices/public",
+  "auth/logout",
   "dietitians/directory",
   "dietitian/profile",
   "dietitian/requests",
+  "admin/practices",
   "admin/dietitians",
   "admin/applicants",
   "admin/applicants/approve",
   "practice/members",
+  "practice/invitations",
   "practice/invitations/accept",
   "admin/dietitians/verification"
 ]);

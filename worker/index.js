@@ -207,6 +207,88 @@ export default {
     const rows=await env.DB.prepare("SELECT u.id,u.email,u.display_name,m.role,m.status,m.created_at FROM practice_memberships m JOIN app_users u ON u.id=m.user_id WHERE m.practice_id=? AND m.status='active' ORDER BY m.created_at DESC LIMIT 200").bind(practiceId).all();
     return json({success:true,members:rows.results||[]},200,headers);
    }
+   if(path==="/dietitians/directory"&&request.method==="GET") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const practiceId=clean(url.searchParams.get("practice_id"),80);
+    const minExp=Math.max(0,Number(url.searchParams.get("min_experience")||0));
+    const maxFee=Math.max(0,Number(url.searchParams.get("max_fee")||0));
+    const specialty=clean(url.searchParams.get("specialty"),80).toLowerCase();
+    const language=clean(url.searchParams.get("language"),60).toLowerCase();
+    const mode=clean(url.searchParams.get("mode"),30).toLowerCase();
+    const gender=clean(url.searchParams.get("gender"),30).toLowerCase();
+    const order=clean(url.searchParams.get("sort"),20);
+    if(!practiceId)return json({success:false,message:"Select an active practice first."},400,headers);
+    const member=session.memberships.find(m=>m.practice_id===practiceId&&m.role==="client");
+    if(!member&&!session.is_platform_admin)return json({success:false,message:"Client membership required for this practice."},403,headers);
+    const rows=await env.DB.prepare("SELECT u.id AS user_id,u.display_name,dp.credentials,dp.registration_number,dp.bio,dp.verification_status,dd.specialties_json,dd.languages_json,dd.consultation_modes_json,dd.gender,dd.fee_minor,dd.experience_years FROM dietitian_profiles dp JOIN app_users u ON u.id=dp.user_id JOIN practice_memberships m ON m.practice_id=dp.practice_id AND m.user_id=dp.user_id AND m.role='dietitian' AND m.status='active' JOIN dietitian_directory dd ON dd.practice_id=dp.practice_id AND dd.user_id=dp.user_id JOIN practices p ON p.id=dp.practice_id WHERE dp.practice_id=? AND p.status='active' AND u.status='active' AND dp.verification_status='verified' AND dd.accepting_clients=1 AND dd.experience_years>=? AND (?=0 OR dd.fee_minor<=?) AND (?='' OR lower(dd.specialties_json) LIKE ?) AND (?='' OR lower(dd.languages_json) LIKE ?) AND (?='' OR lower(dd.consultation_modes_json) LIKE ?) AND (?='' OR lower(coalesce(dd.gender,''))=?)").bind(practiceId,minExp,maxFee,maxFee,specialty,"%"+specialty+"%",language,"%"+language+"%",mode,"%"+mode+"%",gender,gender).all();
+    const dietitians=(rows.results||[]).map(d=>({...d,specialties:JSON.parse(d.specialties_json||"[]"),languages:JSON.parse(d.languages_json||"[]"),consultation_modes:JSON.parse(d.consultation_modes_json||"[]")}));
+    dietitians.sort((a,b)=>order==="fee_low"?a.fee_minor-b.fee_minor:order==="experience"?b.experience_years-a.experience_years:a.display_name.localeCompare(b.display_name));
+    return json({success:true,dietitians},200,headers);
+   }
+   if(path==="/dietitian/profile"&&request.method==="POST") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const b=await body(request),practiceId=clean(b.practice_id,80);
+    const member=session.memberships.find(m=>m.practice_id===practiceId&&m.role==="dietitian"&&m.status==="active");
+    if(!member&&!session.is_platform_admin)return json({success:false,message:"Dietitian membership required."},403,headers);
+    const specialties=Array.isArray(b.specialties)?b.specialties.map(x=>clean(x,60)).filter(Boolean).slice(0,12):[];
+    const languages=Array.isArray(b.languages)?b.languages.map(x=>clean(x,40)).filter(Boolean).slice(0,12):[];
+    const modes=Array.isArray(b.consultation_modes)?b.consultation_modes.map(x=>clean(x,30)).filter(x=>["Online","In-person","Hybrid"].includes(x)).slice(0,3):["Online"];
+    const fee=Math.max(0,Math.min(10000000,Math.round(Number(b.fee_rupees||0)*100)));
+    const exp=Math.max(0,Math.min(70,Math.round(Number(b.experience_years||0)));
+    const gender=clean(b.gender,30),bio=clean(b.bio,1200),credentials=clean(b.credentials,180),reg=clean(b.registration_number,100);
+    await env.DB.prepare("INSERT INTO dietitian_profiles(id,practice_id,user_id,credentials,registration_number,bio) VALUES(?,?,?,?,?,?) ON CONFLICT(practice_id,user_id) DO UPDATE SET credentials=excluded.credentials,registration_number=excluded.registration_number,bio=excluded.bio").bind(id(),practiceId,session.user_id,credentials,reg,bio).run();
+    await env.DB.prepare("INSERT INTO dietitian_directory(user_id,practice_id,specialties_json,languages_json,consultation_modes_json,gender,fee_minor,experience_years,accepting_clients,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id,practice_id) DO UPDATE SET specialties_json=excluded.specialties_json,languages_json=excluded.languages_json,consultation_modes_json=excluded.consultation_modes_json,gender=excluded.gender,fee_minor=excluded.fee_minor,experience_years=excluded.experience_years,accepting_clients=excluded.accepting_clients,updated_at=excluded.updated_at").bind(session.user_id,practiceId,JSON.stringify(specialties),JSON.stringify(languages),JSON.stringify(modes),gender,fee,exp,b.accepting_clients===false?0:1,now()).run();
+    await audit(env,session.user_id,practiceId,"dietitian.profile_updated","dietitian_profile",session.user_id);
+    return json({success:true,message:"Profile saved. It will appear in the client directory after Super Admin verification."},200,headers);
+   }
+   if(path==="/dietitian/requests"&&request.method==="GET") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const rows=await env.DB.prepare("SELECT r.id,r.practice_id,r.client_user_id,r.dietitian_user_id,r.message,r.status,r.created_at,p.name AS practice_name,c.display_name AS client_name,c.email AS client_email,d.display_name AS dietitian_name FROM dietitian_requests r JOIN practices p ON p.id=r.practice_id JOIN app_users c ON c.id=r.client_user_id JOIN app_users d ON d.id=r.dietitian_user_id WHERE r.client_user_id=? OR r.dietitian_user_id=? ORDER BY r.created_at DESC LIMIT 200").bind(session.user_id,session.user_id).all();
+    return json({success:true,requests:rows.results||[]},200,headers);
+   }
+   if(path==="/dietitian/requests"&&request.method==="POST") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const b=await body(request),practiceId=clean(b.practice_id,80),dietitianId=clean(b.dietitian_user_id,80),message=clean(b.message,1000);
+    const member=session.memberships.find(m=>m.practice_id===practiceId&&m.role==="client"&&m.status==="active");
+    if(!member)return json({success:false,message:"Client membership required."},403,headers);
+    const found=await env.DB.prepare("SELECT dp.user_id FROM dietitian_profiles dp JOIN dietitian_directory dd ON dd.user_id=dp.user_id AND dd.practice_id=dp.practice_id JOIN practices p ON p.id=dp.practice_id WHERE dp.practice_id=? AND dp.user_id=? AND dp.verification_status='verified' AND dd.accepting_clients=1 AND p.status='active'").bind(practiceId,dietitianId).first();
+    if(!found)return json({success:false,message:"This dietitian is not available for selection."},404,headers);
+    const requestId=id();
+    await env.DB.prepare("INSERT INTO dietitian_requests(id,practice_id,client_user_id,dietitian_user_id,message) VALUES(?,?,?,?,?) ON CONFLICT(client_user_id,practice_id,dietitian_user_id) DO UPDATE SET message=excluded.message,status='pending',updated_at=?").bind(requestId,practiceId,session.user_id,dietitianId,message,now()).run();
+    await audit(env,session.user_id,practiceId,"dietitian.requested","dietitian_request",requestId);
+    return json({success:true,message:"Request sent to the dietitian."},201,headers);
+   }
+   const requestMatch=path.match(/^\/dietitian\/requests\/([a-f0-9-]+)\/decision$/);
+   if(requestMatch&&request.method==="POST") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const b=await body(request),status=clean(b.status,20);
+    if(!["accepted","declined"].includes(status))return json({success:false,message:"Invalid decision."},400,headers);
+    const req=await env.DB.prepare("SELECT * FROM dietitian_requests WHERE id=?").bind(requestMatch[1]).first();
+    if(!req||req.dietitian_user_id!==session.user_id)return json({success:false,message:"Request not found."},404,headers);
+    const membership=session.memberships.find(m=>m.practice_id===req.practice_id&&m.role==="dietitian"&&m.status==="active");
+    if(!membership&&!session.is_platform_admin)return json({success:false,message:"Dietitian access required."},403,headers);
+    await env.DB.prepare("UPDATE dietitian_requests SET status=?,updated_at=? WHERE id=?").bind(status,now(),req.id).run();
+    if(status==="accepted"){
+      await env.DB.prepare("INSERT INTO client_profiles(id,practice_id,user_id,assigned_dietitian_user_id) VALUES(?,?,?,?) ON CONFLICT(practice_id,user_id) DO UPDATE SET assigned_dietitian_user_id=excluded.assigned_dietitian_user_id").bind(id(),req.practice_id,req.client_user_id,session.user_id).run();
+      await env.DB.prepare("INSERT INTO conversations(id,practice_id,client_user_id,dietitian_user_id,status) VALUES(?,?,?,?,'open')").bind(id(),req.practice_id,req.client_user_id,session.user_id).run();
+    }
+    await audit(env,session.user_id,req.practice_id,"dietitian.request_"+status,"dietitian_request",req.id);
+    return json({success:true,message:"Request "+status+"."},200,headers);
+   }
+   if(path==="/admin/dietitians"&&request.method==="GET") {
+    if(!session?.is_platform_admin)return json({success:false,message:"Platform administrator access required."},session?403:401,headers);
+    const rows=await env.DB.prepare("SELECT dp.user_id,dp.practice_id,dp.credentials,dp.registration_number,dp.bio,dp.verification_status,u.display_name,u.email,p.name AS practice_name,dd.specialties_json,dd.languages_json,dd.consultation_modes_json,dd.fee_minor,dd.experience_years,dd.accepting_clients FROM dietitian_profiles dp JOIN app_users u ON u.id=dp.user_id JOIN practices p ON p.id=dp.practice_id LEFT JOIN dietitian_directory dd ON dd.user_id=dp.user_id AND dd.practice_id=dp.practice_id ORDER BY dp.created_at DESC LIMIT 300").all();
+    return json({success:true,dietitians:rows.results||[]},200,headers);
+   }
+   const verifyMatch=path.match(/^\/admin\/dietitians\/([a-f0-9-]+)\/verification$/);
+   if(verifyMatch&&request.method==="POST") {
+    if(!session?.is_platform_admin)return json({success:false,message:"Platform administrator access required."},session?403:401,headers);
+    const b=await body(request),status=clean(b.status,20),practiceId=clean(b.practice_id,80);
+    if(!["verified","rejected","pending","expired"].includes(status))return json({success:false,message:"Invalid verification status."},400,headers);
+    await env.DB.prepare("UPDATE dietitian_profiles SET verification_status=? WHERE user_id=? AND practice_id=?").bind(status,verifyMatch[1],practiceId).run();
+    await audit(env,session.user_id,practiceId,"dietitian.verification_changed","dietitian_profile",verifyMatch[1],{status});
+    return json({success:true},200,headers);
+   }
    return json({success:false,message:"Not found."},404,headers);
   } catch (e) {
    console.error("API request failed", { path, message: String(e?.message || e), stack: String(e?.stack || "").slice(0,1200) });

@@ -88,7 +88,7 @@ function showApp(){
  $('adminArea').classList.toggle('hidden',!currentUser.is_platform_admin);
  $('memberArea').classList.toggle('hidden',currentUser.is_platform_admin);
  $('clientDirectoryArea').classList.remove('hidden');
- const isDietitian=currentUser.memberships.some(m=>m.role==='dietitian'||m.role==='owner'||m.role==='admin');
+ const isDietitian=currentUser.memberships.some(m=>m.role==='dietitian');
  $('dietitianArea').classList.toggle('hidden',!isDietitian);
  $('superDietitianArea').classList.toggle('hidden',!currentUser.is_platform_admin);
  if(currentUser.is_platform_admin){loadPractices();loadDietitianAdmin()}

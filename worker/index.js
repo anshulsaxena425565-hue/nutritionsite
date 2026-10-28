@@ -41,7 +41,7 @@ async function establishSession(env,userId,headers){
 async function getSession(request, env) {
   const raw = (request.headers.get("Cookie") || "").split(";").map(s => s.trim()).find(s => s.startsWith("pn_session="))?.slice("pn_session=".length);
   if (!raw) return null;
-  const row = await env.DB.prepare("SELECT s.id AS session_id,s.user_id,s.expires_at,u.email,u.display_name,u.status FROM auth_sessions s JOIN app_users u ON u.id=s.user_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>? AND u.status='active'").bind(await hash(raw), now()).first();
+  const row = await env.DB.prepare("SELECT s.id AS session_id,s.user_id,s.expires_at,u.email,u.display_name,u.status,u.account_type FROM auth_sessions s JOIN app_users u ON u.id=s.user_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>? AND u.status='active'").bind(await hash(raw), now()).first();
   if (!row) return null;
   const admin = await env.DB.prepare("SELECT status FROM platform_admins WHERE user_id=?").bind(row.user_id).first();
   const memberships = await env.DB.prepare("SELECT m.practice_id,m.role,m.status,p.name AS practice_name,p.slug AS practice_slug,p.status AS practice_status FROM practice_memberships m JOIN practices p ON p.id=m.practice_id WHERE m.user_id=? AND m.status='active' AND p.status='active' ORDER BY p.name").bind(row.user_id).all();
@@ -69,24 +69,24 @@ export default {
     return json({success:true,message:"Thank you. Your enquiry has been received.",reference:ref},200,headers);
    }
    if (path === "/auth/register" && request.method === "POST") {
-    const b=await body(request),name=clean(b.full_name,120),email=clean(b.email,254).toLowerCase(),phone=clean(b.mobile,24).replace(/[\\s()+.-]/g,""),password=b.password;
+    const b=await body(request),name=clean(b.full_name,120),email=clean(b.email,254).toLowerCase(),phone=clean(b.mobile,24).replace(/[\\s()+.-]/g,""),password=b.password,accountType=b.account_type==="dietitian"?"dietitian":"client";
     if(name.length<2||!emailOk(email)||!/^[0-9]{7,15}$/.test(phone)||!validPassword(password))
       return json({success:false,message:"Enter your name, a valid email, mobile number and a password of at least 10 characters containing letters and numbers."},400,headers);
     const existing=await env.DB.prepare("SELECT id FROM app_users WHERE email=? COLLATE NOCASE OR phone=? LIMIT 1").bind(email,phone).first();
     if(existing)return json({success:false,message:"An account already exists for that email or mobile. Sign in instead, or use account recovery."},409,headers);
     const userId=id(),stored=await passwordHash(password);
-    await env.DB.prepare("INSERT INTO app_users(id,email,display_name,phone,password_hash,status) VALUES(?,?,?,?,?,'active')").bind(userId,email,name,phone,stored).run();
+    await env.DB.prepare("INSERT INTO app_users(id,email,display_name,phone,password_hash,status,account_type) VALUES(?,?,?,?,?,'active',?)").bind(userId,email,name,phone,stored,accountType).run();
     const sessionHeaders=await establishSession(env,userId,headers);
     await audit(env,userId,null,"auth.register","user",userId);
-    return json({success:true,message:"Account created.",user:{id:userId,email,display_name:name}},201,sessionHeaders);
+    return json({success:true,message:"Account created.",user:{id:userId,email,display_name:name,account_type:accountType}},201,sessionHeaders);
    }
    if (path === "/auth/login" && request.method === "POST") {
     const b=await body(request),identifier=clean(b.identifier,254).toLowerCase(),password=b.password;
     if(!identifier||typeof password!=="string"||password.length>128)return json({success:false,message:"Enter your email/mobile and password."},400,headers);
-    const user=await env.DB.prepare("SELECT id,email,display_name,status,password_hash FROM app_users WHERE (email=? COLLATE NOCASE OR phone=?) LIMIT 1").bind(identifier,identifier.replace(/[\\s()+.-]/g,"")).first();
+    const user=await env.DB.prepare("SELECT id,email,display_name,status,password_hash,account_type FROM app_users WHERE (email=? COLLATE NOCASE OR phone=?) LIMIT 1").bind(identifier,identifier.replace(/[\\s()+.-]/g,"")).first();
     if(!user||user.status!=="active"||!(await passwordMatches(password,user.password_hash)))return json({success:false,message:"Email/mobile or password is incorrect."},401,headers);
     const sessionHeaders=await establishSession(env,user.id,headers);
-    return json({success:true,message:"Signed in.",user:{id:user.id,email:user.email,display_name:user.display_name}},200,sessionHeaders);
+    return json({success:true,message:"Signed in.",user:{id:user.id,email:user.email,display_name:user.display_name,account_type:user.account_type||"client"}},200,sessionHeaders);
    }
    if (path === "/auth/request-code" && request.method === "POST") {
     const b=await body(request), email=clean(b.email,254).toLowerCase();
@@ -127,7 +127,7 @@ export default {
    }
    if (path === "/auth/me" && request.method === "GET") {
     const s=await getSession(request,env); if(!s)return json({success:false,message:"Not signed in."},401,headers);
-    return json({success:true,user:{id:s.user_id,email:s.email,display_name:s.display_name,is_platform_admin:s.is_platform_admin,memberships:s.memberships}},200,headers);
+    return json({success:true,user:{id:s.user_id,email:s.email,display_name:s.display_name,account_type:s.account_type||"client",is_platform_admin:s.is_platform_admin,memberships:s.memberships}},200,headers);
    }
    if (path === "/admin/bootstrap" && request.method === "POST") {
     if(!env.BOOTSTRAP_SECRET) return json({success:false,message:"Bootstrap is disabled until a server secret is configured."},503,headers);

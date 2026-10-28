@@ -282,6 +282,34 @@ export default {
     await audit(env,session.user_id,req.practice_id,"dietitian.request_"+status,"dietitian_request",req.id);
     return json({success:true,message:"Request "+status+"."},200,headers);
    }
+   if(path==="/admin/applicants"&&request.method==="GET") {
+    if(!session?.is_platform_admin)return json({success:false,message:"Platform administrator access required."},session?403:401,headers);
+    const rows=await env.DB.prepare("SELECT u.id AS user_id,u.display_name,u.email,u.created_at,u.account_type, (SELECT COUNT(*) FROM practice_memberships m WHERE m.user_id=u.id AND m.status='active') AS active_memberships FROM app_users u WHERE u.account_type='dietitian' ORDER BY u.created_at DESC LIMIT 300").all();
+    return json({success:true,applicants:rows.results||[]},200,headers);
+   }
+   if(path==="/admin/applicants/approve"&&request.method==="POST") {
+    if(!session?.is_platform_admin)return json({success:false,message:"Platform administrator access required."},session?403:401,headers);
+    const b=await body(request),userId=clean(b.user_id,80),practiceId=clean(b.practice_id,80);
+    if(!userId)return json({success:false,message:"Applicant account required."},400,headers);
+    const applicant=await env.DB.prepare("SELECT id,email,display_name,account_type FROM app_users WHERE id=? AND status='active'").bind(userId).first();
+    if(!applicant||applicant.account_type!=="dietitian")return json({success:false,message:"Active dietitian applicant not found."},404,headers);
+    let practice=practiceId?await env.DB.prepare("SELECT id,name FROM practices WHERE id=? AND status='active'").bind(practiceId).first():null;
+    if(practiceId&&!practice)return json({success:false,message:"Choose an active practice."},400,headers);
+    if(!practice){
+      practice=await env.DB.prepare("SELECT id,name FROM practices WHERE status='active' ORDER BY created_at LIMIT 1").first();
+    }
+    if(!practice){
+      const pid=id(),slug="prachi-nutrition";
+      await env.DB.prepare("INSERT INTO practices(id,name,slug,status) VALUES(?,?,?,'active')").bind(pid,"Prachi Nutrition",slug).run();
+      await env.DB.prepare("INSERT INTO practice_settings(practice_id) VALUES(?)").bind(pid).run();
+      practice={id:pid,name:"Prachi Nutrition"};
+    }
+    await env.DB.prepare("INSERT INTO practice_memberships(id,practice_id,user_id,role,status) VALUES(?,?,?,'dietitian','active') ON CONFLICT(practice_id,user_id) DO UPDATE SET role='dietitian',status='active'").bind(id(),practice.id,userId).run();
+    await env.DB.prepare("INSERT OR IGNORE INTO dietitian_profiles(id,practice_id,user_id,verification_status) VALUES(?,?,?,'verified')").bind(id(),practice.id,userId).run();
+    await env.DB.prepare("UPDATE dietitian_profiles SET verification_status='verified' WHERE user_id=? AND practice_id=?").bind(userId,practice.id).run();
+    await audit(env,session.user_id,practice.id,"dietitian.application_approved","user",userId,{applicant_email:applicant.email});
+    return json({success:true,message:"Dietitian approved and added to "+practice.name+".",practice_id:practice.id},200,headers);
+   }
    if(path==="/admin/dietitians"&&request.method==="GET") {
     if(!session?.is_platform_admin)return json({success:false,message:"Platform administrator access required."},session?403:401,headers);
     const rows=await env.DB.prepare("SELECT dp.user_id,dp.practice_id,dp.credentials,dp.registration_number,dp.bio,dp.verification_status,u.display_name,u.email,p.name AS practice_name,dd.specialties_json,dd.languages_json,dd.consultation_modes_json,dd.fee_minor,dd.experience_years,dd.accepting_clients FROM dietitian_profiles dp JOIN app_users u ON u.id=dp.user_id JOIN practices p ON p.id=dp.practice_id LEFT JOIN dietitian_directory dd ON dd.user_id=dp.user_id AND dd.practice_id=dp.practice_id ORDER BY dp.created_at DESC LIMIT 300").all();

@@ -137,6 +137,8 @@ export default {
     const membership=session.memberships.find(m=>m.practice_id===practiceId&&["owner","admin"].includes(m.role));
     if(!membership)return json({success:false,message:"Practice owner/admin access required."},403,headers);
     if(!emailOk(email)||!["admin","dietitian","assistant","client"].includes(role))return json({success:false,message:"Valid email and permitted role required."},400,headers);
+    const existingInviteUser=await env.DB.prepare("SELECT id FROM app_users WHERE email=? COLLATE NOCASE").bind(email).first();
+    if(!existingInviteUser) await env.DB.prepare("INSERT INTO app_users(id,email,display_name,status) VALUES(?,?,?,'active')").bind(id(),email,email.split("@")[0].slice(0,120)).run();
     const token=randomToken(32),inviteId=id(),expires=new Date(Date.now()+7*24*60*60*1000).toISOString();
     await env.DB.prepare("INSERT INTO practice_invitations(id,practice_id,email,role,invited_by_user_id,token_hash,expires_at) VALUES(?,?,?,?,?,?,?)").bind(inviteId,practiceId,email,role,session.user_id,await hash(token),expires).run();
     if(env.RESEND_API_KEY&&env.MAIL_FROM) {

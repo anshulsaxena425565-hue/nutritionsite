@@ -1,11 +1,20 @@
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("X-Content-Type-Options", "nosniff");
-  const rawPath = Array.isArray(req.query.path) ? req.query.path : [req.query.path].filter(Boolean);
-  const path = "/" + rawPath.map(part => encodeURIComponent(String(part))).join("/");
-  const target = new URL(path, "https://prachi-nutrition-api.prachisayani-api.workers.dev");
+  // Prefer the actual request URL; Vercel's catch-all query shape can vary.
+  const requestUrl = new URL(req.url || "/", "https://local.invalid");
+  const prefix = "/api/platform";
+  let suffix = requestUrl.pathname.startsWith(prefix) ? requestUrl.pathname.slice(prefix.length) : "";
+  if (!suffix || suffix === "/") {
+    const raw = req.query?.path;
+    const parts = Array.isArray(raw) ? raw : raw ? [raw] : [];
+    suffix = parts.length ? "/" + parts.map(v => encodeURIComponent(String(v))).join("/") : "";
+  }
+  if (!suffix || suffix === "/") return res.status(404).json({success:false,message:"API route not found."});
+  const target = new URL("https://prachi-nutrition-api.prachisayani-api.workers.dev" + suffix);
+  for (const [key, value] of requestUrl.searchParams.entries()) target.searchParams.append(key, value);
   for (const [key, value] of Object.entries(req.query || {})) {
-    if (key === "path" || value == null) continue;
+    if (key === "path" || value == null || requestUrl.searchParams.has(key)) continue;
     for (const v of Array.isArray(value) ? value : [value]) target.searchParams.append(key, String(v));
   }
   const headers = { Accept: "application/json" };

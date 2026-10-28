@@ -12,7 +12,7 @@ const ROUTES = new Set([
 ]);
 
 export default function handler(req, res) {
-  const path = String(req.query?.path || "");
+  const path = Array.isArray(req.query?.path) ? req.query.path.join("/") : String(req.query?.path || "");
   const endpoint = path.replace(/^\/+|\/+$/g, "");
   const allowed = endpoint && (
     ROUTES.has(endpoint) ||

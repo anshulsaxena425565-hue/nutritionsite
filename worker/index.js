@@ -449,15 +449,6 @@ export default {
     const rows=await env.DB.prepare("SELECT u.id AS user_id,u.display_name,u.email,u.phone,u.status AS user_status,u.created_at,u.account_type,(SELECT COUNT(*) FROM practice_memberships m WHERE m.user_id=u.id AND m.status='active') AS active_memberships,dp.practice_id,p.name AS practice_name,dp.credentials,dp.registration_number,dp.bio,dp.verification_status,dd.specialties_json,dd.languages_json,dd.consultation_modes_json,dd.fee_minor,dd.experience_years,dd.accepting_clients FROM app_users u LEFT JOIN dietitian_profiles dp ON dp.user_id=u.id LEFT JOIN practices p ON p.id=dp.practice_id LEFT JOIN dietitian_directory dd ON dd.user_id=dp.user_id AND dd.practice_id=dp.practice_id WHERE u.account_type='dietitian' ORDER BY u.created_at DESC LIMIT 500").all();
     return json({success:true,dietitians:rows.results||[]},200,headers);
    }
-   const verifyMatch=path.match(/^\/admin\/dietitians\/([a-f0-9-]+)\/verification$/);
-   if(verifyMatch&&request.method==="POST") {
-    if(!session?.is_platform_admin)return json({success:false,message:"Platform administrator access required."},session?403:401,headers);
-    const b=await body(request),status=clean(b.status,20),practiceId=clean(b.practice_id,80);
-    if(!["verified","rejected","pending","expired"].includes(status))return json({success:false,message:"Invalid verification status."},400,headers);
-    await env.DB.prepare("UPDATE dietitian_profiles SET verification_status=? WHERE user_id=? AND practice_id=?").bind(status,verifyMatch[1],practiceId).run();
-    await audit(env,session.user_id,practiceId,"dietitian.verification_changed","dietitian_profile",verifyMatch[1],{status});
-    return json({success:true},200,headers);
-   }
    return json({success:false,message:"Not found."},404,headers);
   } catch (e) {
    console.error("API request failed", { path, message: String(e?.message || e), stack: String(e?.stack || "").slice(0,1200) });

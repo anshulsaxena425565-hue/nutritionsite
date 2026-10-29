@@ -245,3 +245,18 @@
 .notification-read{flex:0 0 auto;color:#7b8197}
 .notification-footnote{margin:16px 0 0;padding-top:14px;border-top:1px solid var(--line);font-size:11px;line-height:1.6;color:var(--muted)}
 @media(max-width:600px){.notification-item,.notification-item.unread{gap:10px;padding:15px 8px}.notification-icon{width:36px;height:36px;flex-basis:36px}.notification-head-actions{width:100%;justify-content:space-between}}
+
+/* Typography readability pass: clearer body copy, labels and dense data */
+body{font-size:15px}
+.btn{font-size:13px}
+.eyebrow,.badge,.nav-group>small,.workspace small,.help p,.help a,.user-mini b,.user-mini small,.crumb,.operational,.top-actions>a,.hero-banner>div:first-child>small,.metric>small,.metric>span:last-child,.panel-head p,.text-btn,.quick b,.quick small,.activity b,.activity small,.diet-card>.muted,.diet-stats span,.tags span,.bio,.diet-card>small,table,th,.table-sub,.empty-state p,.helper,.footer,.checklist-row small,.message small,.notification-item small,.notification-copy,.notification-meta,.notification-empty p{font-size:12px}
+.field>span,.nav-item,.notice,.tabs button,.auth-card>.muted,.filter-actions>span,.form-foot,.check,.journey-progress-step strong{font-size:13px}
+.page-head p,.hero-banner p,.panel-head p,.quick small,.activity small,.bio,.helper,.footer{line-height:1.55}
+.metric>small,.metric>span:last-child,.panel-head p,.quick small,.activity small,.diet-card>.muted,.diet-stats span,.tags span,.table-sub,.empty-state p,.helper,.footer,.checklist-row small,.message small{color:var(--muted)}
+@media(max-width:640px){
+  body{font-size:15px}
+  .page-head p,.hero-banner p{font-size:12px}
+  .metric>small,.metric>span:last-child{font-size:11px}
+  table{font-size:12px}
+}
+

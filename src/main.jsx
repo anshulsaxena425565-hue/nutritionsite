@@ -3,7 +3,7 @@ import{createPortal}from'react-dom';
 import{createRoot}from'react-dom/client';
 import{Activity,ArrowLeft,ArrowRight,Building2,CalendarClock,CalendarDays,MessageCircle,Utensils,BadgeCheck,Bell,BriefcaseMedical,Check,ChevronDown,CircleHelp,ClipboardCheck,ClipboardList,Filter,GraduationCap,HeartPulse,LayoutDashboard,LogOut,Menu,Plus,RefreshCw,Search,Settings,ShieldCheck,SlidersHorizontal,Sparkles,UserRound,Users,X,Scale,ListTodo,CheckCircle2,Trash2,TrendingUp,Send}from'lucide-react';
 import'./styles.css';
-const API='/api/platform';
+const API='https://prachi-nutrition-api.prachisayani-api.workers.dev';
 async function api(path,options={}){const r=await fetch(API+path,{...options,credentials:'include',headers:{'Content-Type':'application/json',...(options.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.message||'Request failed ('+r.status+')');return d}
 const cx=(...x)=>x.filter(Boolean).join(' ');
 function Btn({children,kind='',...p}){return <button className={cx('btn',kind)} {...p}>{children}</button>}

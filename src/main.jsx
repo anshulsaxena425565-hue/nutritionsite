@@ -1,7 +1,7 @@
 import React,{useEffect,useState} from 'react';
 import{createPortal}from'react-dom';
 import{createRoot}from'react-dom/client';
-import{Activity,ArrowLeft,ArrowRight,Building2,CalendarClock,CalendarDays,MessageCircle,Utensils,BadgeCheck,Bell,BriefcaseMedical,Check,ChevronDown,CircleHelp,ClipboardCheck,ClipboardList,Filter,GraduationCap,HeartPulse,LayoutDashboard,LogOut,Menu,Plus,RefreshCw,Search,Settings,ShieldCheck,SlidersHorizontal,Sparkles,UserRound,Users,X,Scale,ListTodo,CheckCircle2,Trash2,TrendingUp,Send}from'lucide-react';
+import{Activity,ArrowLeft,ArrowRight,BookOpen,Bookmark,Building2,CalendarClock,CalendarDays,MessageCircle,Utensils,BadgeCheck,Bell,BriefcaseMedical,Check,ChevronDown,CircleHelp,ClipboardCheck,ClipboardList,Download,Droplet,Eye,FileText,Filter,Flame,GlassWater,GraduationCap,HeartPulse,LayoutDashboard,ListChecks,LogOut,Menu,Pencil,Plus,RefreshCw,Search,Settings,ShieldCheck,Save,SlidersHorizontal,Sparkles,Sprout,UserRound,Users,X,Scale,ListTodo,CheckCircle2,Trash2,TrendingUp,Send,Wheat}from'lucide-react';
 import'./styles.css';
 const API='https://prachi-nutrition-api.prachisayani-api.workers.dev';
 async function api(path,options={}){const r=await fetch(API+path,{...options,credentials:'include',headers:{'Content-Type':'application/json',...(options.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.message||'Request failed ('+r.status+')');return d}

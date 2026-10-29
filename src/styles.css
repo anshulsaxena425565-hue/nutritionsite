@@ -260,3 +260,49 @@ body{font-size:15px}
   table{font-size:12px}
 }
 
+/* Dietitian public profile detail page */
+.dietitian-profile-page{display:grid;gap:18px;min-width:0}
+.dietitian-back{display:inline-flex;align-items:center;gap:8px;justify-self:start;border:0;background:transparent;color:#5a52c9;font-weight:700;font-size:13px;padding:5px 0}
+.dietitian-back:hover{color:#3f38a7}
+.dietitian-profile-hero{display:grid;grid-template-columns:78px minmax(0,1fr) minmax(210px,260px);align-items:center;gap:20px;padding:26px;background:linear-gradient(120deg,#fff 0%,#fafaff 68%,#f0efff 100%);border:1px solid #e8e8f5;border-radius:17px;box-shadow:var(--shadow)}
+.dietitian-profile-avatar{width:76px;height:76px;display:grid;place-items:center;border-radius:22px;background:linear-gradient(145deg,#e6e3ff,#c9c4ff);color:#4e46bd;font-size:24px;font-weight:800;letter-spacing:-.5px}
+.dietitian-profile-intro{min-width:0}
+.dietitian-profile-kickers{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+.dietitian-profile-intro h2{font-size:27px;line-height:1.2;letter-spacing:-.8px;color:#252d46;margin:0 0 7px;overflow-wrap:anywhere}
+.dietitian-profile-credentials{margin:0;color:#68718a;font-size:14px;line-height:1.5}
+.dietitian-practice-line{display:flex;align-items:center;gap:6px;margin:10px 0 0;color:#626b83;font-size:13px}
+.dietitian-practice-line svg{color:#6a62d4;flex-shrink:0}
+.dietitian-profile-primary-action{display:flex;flex-direction:column;gap:8px;align-items:stretch}
+.dietitian-profile-primary-action .btn{width:100%;font-size:14px;padding:13px 15px}
+.dietitian-profile-primary-action small{font-size:11px;line-height:1.5;color:#858ca0;text-align:center}
+.dietitian-profile-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.8fr);align-items:start;gap:18px}
+.dietitian-profile-main{display:grid;gap:16px;min-width:0}
+.dietitian-profile-aside{display:grid;gap:12px;min-width:0}
+.dietitian-info-panel{min-width:0;padding:21px;background:#fff;border:1px solid #eceef5;border-radius:14px;box-shadow:var(--shadow)}
+.dietitian-section-heading{display:flex;align-items:center;gap:11px;margin-bottom:17px}
+.dietitian-section-heading>span{width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;border-radius:11px;background:#f0efff;color:#5a52d5}
+.dietitian-section-heading h3{font-size:16px;color:#2a3248;margin:0 0 4px}
+.dietitian-section-heading p{font-size:12px;color:#858ca0;line-height:1.45;margin:0}
+.dietitian-full-bio{white-space:pre-line;color:#596279;font-size:14px;line-height:1.85;margin:0;overflow-wrap:anywhere}
+.dietitian-specialty-list{display:flex;flex-wrap:wrap;gap:8px}
+.dietitian-specialty-list span{display:inline-flex;align-items:center;padding:8px 11px;background:#f5f4ff;border:1px solid #e7e5ff;border-radius:8px;color:#5149b9;font-size:12px;font-weight:600}
+.dietitian-profile-muted{font-size:13px;color:#858ca0;line-height:1.6;margin:0}
+.dietitian-credentials-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.dietitian-credentials-grid>div{display:flex;flex-direction:column;gap:7px;min-width:0;padding:13px;background:#fafaff;border:1px solid #eff0f7;border-radius:10px}
+.dietitian-credentials-grid small{font-size:11px;color:#858ca0;line-height:1.4}
+.dietitian-credentials-grid b{font-size:13px;line-height:1.5;color:#343c54;overflow-wrap:anywhere}
+.dietitian-detail-row{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:13px 0;border-bottom:1px solid #f0f1f6}
+.dietitian-detail-row:first-of-type{padding-top:0}
+.dietitian-detail-row:last-of-type{border-bottom:0}
+.dietitian-detail-row>span{font-size:12px;color:#81899e;flex:0 0 40%}
+.dietitian-detail-row>b{font-size:13px;line-height:1.5;color:#30394f;text-align:right;overflow-wrap:anywhere}
+.dietitian-detail-row:first-of-type>b{font-size:19px;color:#4e46bd}
+.dietitian-request-note{display:flex;align-items:flex-start;gap:9px;margin:16px 0;padding:12px;border-radius:10px;background:#f6f6ff;color:#625ca8}
+.dietitian-request-note svg{flex-shrink:0;margin-top:2px}
+.dietitian-request-note p{font-size:11px;line-height:1.6;margin:0}
+.dietitian-profile-aside .btn{width:100%;font-size:14px;padding:13px}
+.dietitian-profile-disclaimer{font-size:11px;color:#8a91a3;line-height:1.6;margin:0;padding:0 3px}
+@media(max-width:1050px){.dietitian-profile-hero{grid-template-columns:70px minmax(0,1fr)}.dietitian-profile-avatar{width:68px;height:68px}.dietitian-profile-primary-action{grid-column:1/-1;max-width:360px;margin-left:88px}.dietitian-profile-layout{grid-template-columns:minmax(0,1fr) minmax(260px,.85fr)}}
+@media(max-width:760px){.dietitian-profile-hero{grid-template-columns:58px minmax(0,1fr);gap:13px;padding:18px}.dietitian-profile-avatar{width:56px;height:56px;border-radius:16px;font-size:19px}.dietitian-profile-intro h2{font-size:22px}.dietitian-profile-credentials{font-size:13px}.dietitian-profile-primary-action{grid-column:1/-1;max-width:none;margin:0}.dietitian-profile-layout{grid-template-columns:1fr;gap:13px}.dietitian-info-panel{padding:17px}.dietitian-profile-aside{grid-row:1}.dietitian-section-heading h3{font-size:15px}}
+@media(max-width:420px){.dietitian-profile-kickers .badge{white-space:normal}.dietitian-credentials-grid{grid-template-columns:1fr}.dietitian-detail-row{gap:10px}.dietitian-detail-row>span{flex-basis:37%}.dietitian-detail-row>b{font-size:12px}.dietitian-profile-intro h2{font-size:20px}}
+

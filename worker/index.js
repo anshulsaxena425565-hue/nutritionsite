@@ -147,7 +147,42 @@ export default {
    const session=await getSession(request,env);
    if(path.startsWith("/admin/")) {
     if(!session?.is_platform_admin) return json({success:false,message:"Platform administrator access required."},session?403:401,headers);
-    if(path==="/admin/practices"&&request.method==="GET") {
+ 
+   if(path==="/admin/users"&&request.method==="GET") {
+      const q=clean(url.searchParams.get("q"),120).toLowerCase(),type=clean(url.searchParams.get("type"),20),status=clean(url.searchParams.get("status"),20);
+      const rows=await env.DB.prepare("SELECT u.id AS user_id,u.display_name,u.email,u.phone,u.account_type,u.status,u.created_at,(SELECT COUNT(*) FROM practice_memberships m WHERE m.user_id=u.id AND m.status='active') AS active_memberships,(SELECT GROUP_CONCAT(DISTINCT p.name, ', ') FROM practice_memberships m JOIN practices p ON p.id=m.practice_id WHERE m.user_id=u.id) AS practices,(SELECT COUNT(*) FROM dietitian_requests r WHERE r.client_user_id=u.id OR r.dietitian_user_id=u.id) AS consultation_count,(SELECT COUNT(*) FROM diet_plans dp WHERE dp.client_user_id=u.id OR dp.dietitian_user_id=u.id) AS diet_plan_count FROM app_users u WHERE (?='' OR lower(u.display_name) LIKE '%'||?||'%' OR lower(u.email) LIKE '%'||?||'%' OR u.phone LIKE '%'||?||'%') AND (?='' OR u.account_type=?) AND (?='' OR u.status=?) ORDER BY u.created_at DESC LIMIT 500").bind(q,q,q,q,type,type,status,status).all();
+      return json({success:true,users:rows.results||[]},200,headers);
+   }
+   const adminUserStatus=path.match(/^\\/admin\\/users\\/([a-f0-9-]+)\\/status$/);
+   if(adminUserStatus&&request.method==="POST") {
+      const targetId=adminUserStatus[1],b=await body(request),status=clean(b.status,20);
+      if(!["active","suspended"].includes(status))return json({success:false,message:"Choose active or suspended."},400,headers);
+      if(targetId===session.user_id)return json({success:false,message:"You cannot suspend your own superadmin account."},400,headers);
+      const target=await env.DB.prepare("SELECT id,account_type,status FROM app_users WHERE id=?").bind(targetId).first();
+      if(!target)return json({success:false,message:"User not found."},404,headers);
+      if(await env.DB.prepare("SELECT 1 AS ok FROM platform_admins WHERE user_id=? AND status='active'").bind(targetId).first())return json({success:false,message:"Superadmin accounts cannot be changed from User Management."},403,headers);
+      await env.DB.prepare("UPDATE app_users SET status=? WHERE id=?").bind(status,targetId).run();
+      await audit(env,session.user_id,null,"admin.user_status_changed","user",targetId,{status,previous_status:target.status});
+      return json({success:true,message:"User "+status+".",status},200,headers);
+   }
+   const adminUserDetail=path.match(/^\\/admin\\/users\\/([a-f0-9-]+)$/);
+   if(adminUserDetail&&request.method==="GET") {
+      const targetId=adminUserDetail[1],target=await env.DB.prepare("SELECT id AS user_id,display_name,email,phone,account_type,status,created_at FROM app_users WHERE id=?").bind(targetId).first();
+      if(!target)return json({success:false,message:"User not found."},404,headers);
+      const [memberships,profile,requests,plans,appointments,conversations]=await Promise.all([
+        env.DB.prepare("SELECT m.practice_id,m.role,m.status AS membership_status,p.name AS practice_name,p.status AS practice_status FROM practice_memberships m JOIN practices p ON p.id=m.practice_id WHERE m.user_id=? ORDER BY p.name").bind(targetId).all(),
+        env.DB.prepare("SELECT dp.practice_id,p.name AS practice_name,dp.credentials,dp.registration_number,dp.bio,dp.verification_status,dd.specialties_json,dd.languages_json,dd.consultation_modes_json,dd.experience_years,dd.fee_minor,dd.accepting_clients FROM dietitian_profiles dp JOIN practices p ON p.id=dp.practice_id LEFT JOIN dietitian_directory dd ON dd.user_id=dp.user_id AND dd.practice_id=dp.practice_id WHERE dp.user_id=?").bind(targetId).all(),
+        env.DB.prepare("SELECT r.id,r.practice_id,p.name AS practice_name,r.client_user_id,cu.display_name AS client_name,r.dietitian_user_id,du.display_name AS dietitian_name,r.message,r.status,r.created_at FROM dietitian_requests r JOIN practices p ON p.id=r.practice_id LEFT JOIN app_users cu ON cu.id=r.client_user_id LEFT JOIN app_users du ON du.id=r.dietitian_user_id WHERE r.client_user_id=? OR r.dietitian_user_id=? ORDER BY r.created_at DESC LIMIT 200").bind(targetId,targetId).all(),
+        env.DB.prepare("SELECT dp.id,dp.practice_id,p.name AS practice_name,dp.client_user_id,cu.display_name AS client_name,dp.dietitian_user_id,du.display_name AS dietitian_name,dp.title,dp.status,dp.current_version,dp.created_at,dp.updated_at,dv.plan_json,dv.notes,dv.published_at FROM diet_plans dp JOIN practices p ON p.id=dp.practice_id LEFT JOIN app_users cu ON cu.id=dp.client_user_id LEFT JOIN app_users du ON du.id=dp.dietitian_user_id LEFT JOIN diet_plan_versions dv ON dv.plan_id=dp.id AND dv.version_number=dp.current_version WHERE dp.client_user_id=? OR dp.dietitian_user_id=? ORDER BY dp.updated_at DESC LIMIT 200").bind(targetId,targetId).all(),
+        env.DB.prepare("SELECT a.id,a.practice_id,p.name AS practice_name,a.client_user_id,cu.display_name AS client_name,a.dietitian_user_id,du.display_name AS dietitian_name,a.starts_at,a.ends_at,a.status,a.notes,a.created_at FROM appointments a JOIN practices p ON p.id=a.practice_id LEFT JOIN app_users cu ON cu.id=a.client_user_id LEFT JOIN app_users du ON du.id=a.dietitian_user_id WHERE a.client_user_id=? OR a.dietitian_user_id=? ORDER BY a.starts_at DESC LIMIT 200").bind(targetId,targetId).all(),
+        env.DB.prepare("SELECT c.id,c.practice_id,p.name AS practice_name,c.client_user_id,cu.display_name AS client_name,c.dietitian_user_id,du.display_name AS dietitian_name,c.status,c.updated_at FROM conversations c JOIN practices p ON p.id=c.practice_id LEFT JOIN app_users cu ON cu.id=c.client_user_id LEFT JOIN app_users du ON du.id=c.dietitian_user_id WHERE c.client_user_id=? OR c.dietitian_user_id=? ORDER BY c.updated_at DESC LIMIT 100").bind(targetId,targetId).all()
+      ]);
+      const chats=[];
+      for(const c of conversations.results||[]){const m=await env.DB.prepare("SELECT m.id,m.sender_user_id,u.display_name AS sender_name,m.body,m.created_at,m.read_at FROM messages m JOIN app_users u ON u.id=m.sender_user_id WHERE m.conversation_id=? ORDER BY m.created_at ASC LIMIT 500").bind(c.id).all();chats.push({...c,messages:m.results||[]});}
+      await audit(env,session.user_id,null,"admin.user_detail_viewed","user",targetId,{included:"memberships,profile,requests,plans,appointments,conversations"});
+      return json({success:true,user:target,memberships:memberships.results||[],dietitian_profiles:profile.results||[],requests:requests.results||[],plans:(plans.results||[]).map(p=>({...p,plan:(()=>{try{return JSON.parse(p.plan_json||"{}")}catch{return {}}})()})),appointments:appointments.results||[],conversations:chats},200,headers);
+   }
+   if(path==="/admin/practices"&&request.method==="GET") {
       const rows=await env.DB.prepare("SELECT p.id,p.name,p.slug,p.status,p.timezone,p.currency,p.created_at,u.email AS owner_email FROM practices p LEFT JOIN app_users u ON u.id=p.owner_user_id ORDER BY p.created_at DESC LIMIT 200").all();
       return json({success:true,practices:rows.results||[]},200,headers);
     }
@@ -411,7 +446,7 @@ export default {
    }
    if(path==="/admin/dietitians"&&request.method==="GET") {
     if(!session?.is_platform_admin)return json({success:false,message:"Platform administrator access required."},session?403:401,headers);
-    const rows=await env.DB.prepare("SELECT dp.user_id,dp.practice_id,dp.credentials,dp.registration_number,dp.bio,dp.verification_status,u.display_name,u.email,p.name AS practice_name,dd.specialties_json,dd.languages_json,dd.consultation_modes_json,dd.fee_minor,dd.experience_years,dd.accepting_clients FROM dietitian_profiles dp JOIN app_users u ON u.id=dp.user_id JOIN practices p ON p.id=dp.practice_id LEFT JOIN dietitian_directory dd ON dd.user_id=dp.user_id AND dd.practice_id=dp.practice_id ORDER BY dp.created_at DESC LIMIT 300").all();
+    const rows=await env.DB.prepare("SELECT u.id AS user_id,u.display_name,u.email,u.phone,u.status AS user_status,u.created_at,u.account_type,(SELECT COUNT(*) FROM practice_memberships m WHERE m.user_id=u.id AND m.status='active') AS active_memberships,dp.practice_id,p.name AS practice_name,dp.credentials,dp.registration_number,dp.bio,dp.verification_status,dd.specialties_json,dd.languages_json,dd.consultation_modes_json,dd.fee_minor,dd.experience_years,dd.accepting_clients FROM app_users u LEFT JOIN dietitian_profiles dp ON dp.user_id=u.id LEFT JOIN practices p ON p.id=dp.practice_id LEFT JOIN dietitian_directory dd ON dd.user_id=dp.user_id AND dd.practice_id=dp.practice_id WHERE u.account_type='dietitian' ORDER BY u.created_at DESC LIMIT 500").all();
     return json({success:true,dietitians:rows.results||[]},200,headers);
    }
    const verifyMatch=path.match(/^\/admin\/dietitians\/([a-f0-9-]+)\/verification$/);

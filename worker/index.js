@@ -279,6 +279,99 @@ export default {
     await audit(env,session.user_id,req.practice_id,"dietitian.request_"+status,"dietitian_request",req.id);
     return json({success:true,message:"Request "+status+"."},200,headers);
    }
+
+   // Dietitian patient-management workspace
+   if(path==="/dietitian/patients"&&request.method==="GET") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const practiceId=clean(url.searchParams.get("practice_id"),80);
+    const member=session.memberships.find(m=>m.practice_id===practiceId&&m.role==="dietitian"&&m.status==="active");
+    if(!member&&!session.is_platform_admin)return json({success:false,message:"Active dietitian membership required."},403,headers);
+    const rows=await env.DB.prepare("SELECT cp.user_id AS client_user_id,cp.preferred_name,cp.date_of_birth,cp.onboarding_status,u.display_name,u.email,cp.practice_id,p.name AS practice_name,cp.created_at,(SELECT COUNT(*) FROM diet_plans dp WHERE dp.practice_id=cp.practice_id AND dp.client_user_id=cp.user_id AND dp.dietitian_user_id=? AND dp.status!='archived') AS plan_count,(SELECT MAX(a.starts_at) FROM appointments a WHERE a.practice_id=cp.practice_id AND a.client_user_id=cp.user_id AND a.dietitian_user_id=?) AS next_appointment FROM client_profiles cp JOIN app_users u ON u.id=cp.user_id JOIN practices p ON p.id=cp.practice_id WHERE cp.practice_id=? AND (cp.assigned_dietitian_user_id=? OR EXISTS(SELECT 1 FROM dietitian_requests r WHERE r.practice_id=cp.practice_id AND r.client_user_id=cp.user_id AND r.dietitian_user_id=? AND r.status='accepted')) AND u.status='active' ORDER BY u.display_name LIMIT 300").bind(session.user_id,session.user_id,practiceId,session.user_id,session.user_id).all();
+    return json({success:true,patients:rows.results||[]},200,headers);
+   }
+   if(path==="/dietitian/plans"&&request.method==="GET") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const clientId=clean(url.searchParams.get("client_user_id"),80),practiceId=clean(url.searchParams.get("practice_id"),80);
+    const member=session.memberships.find(m=>m.practice_id===practiceId&&m.role==="dietitian"&&m.status==="active");
+    if(!member&&!session.is_platform_admin)return json({success:false,message:"Active dietitian membership required."},403,headers);
+    const rows=await env.DB.prepare("SELECT id,practice_id,client_user_id,dietitian_user_id,title,status,current_version,created_at,updated_at FROM diet_plans WHERE practice_id=? AND dietitian_user_id=? AND (?='' OR client_user_id=?) ORDER BY updated_at DESC LIMIT 200").bind(practiceId,session.user_id,clientId,clientId).all();
+    const plans=[];
+    for(const p of rows.results||[]){const v=await env.DB.prepare("SELECT plan_json,notes,version_number FROM diet_plan_versions WHERE plan_id=? AND version_number=?").bind(p.id,p.current_version).first();plans.push({...p,plan:v?JSON.parse(v.plan_json||"{}"):{},notes:v?.notes||""});}
+    return json({success:true,plans},200,headers);
+   }
+   if(path==="/dietitian/plans"&&request.method==="POST") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const b=await body(request),practiceId=clean(b.practice_id,80),clientId=clean(b.client_user_id,80),title=clean(b.title,160)||"Nutrition care plan";
+    const member=session.memberships.find(m=>m.practice_id===practiceId&&m.role==="dietitian"&&m.status==="active");
+    if(!member&&!session.is_platform_admin)return json({success:false,message:"Active dietitian membership required."},403,headers);
+    const connected=await env.DB.prepare("SELECT 1 AS ok FROM dietitian_requests WHERE practice_id=? AND client_user_id=? AND dietitian_user_id=? AND status='accepted' UNION SELECT 1 AS ok FROM client_profiles WHERE practice_id=? AND user_id=? AND assigned_dietitian_user_id=? LIMIT 1").bind(practiceId,clientId,session.user_id,practiceId,clientId,session.user_id).first();
+    if(!connected)return json({success:false,message:"A client must accept/connect with you before you can create their plan."},403,headers);
+    const planId=id(),plan=b.plan&&typeof b.plan==="object"?b.plan:{meals:[]},notes=clean(b.notes,3000),status=b.publish===true?"published":"draft";
+    await env.DB.prepare("INSERT INTO diet_plans(id,practice_id,client_user_id,dietitian_user_id,title,status,current_version) VALUES(?,?,?,?,?,?,1)").bind(planId,practiceId,clientId,session.user_id,title,status).run();
+    await env.DB.prepare("INSERT INTO diet_plan_versions(id,plan_id,version_number,plan_json,notes,published_at,created_by_user_id) VALUES(?,?,1,?,?,?,?)").bind(id(),planId,JSON.stringify(plan),notes,status==="published"?now():null,session.user_id).run();
+    await audit(env,session.user_id,practiceId,"diet_plan.created","diet_plan",planId,{client_user_id:clientId,status});
+    return json({success:true,plan_id:planId,message:status==="published"?"Diet chart published to the client.":"Diet chart saved as draft."},201,headers);
+   }
+   const planMatch=path.match(/^\/dietitian\/plans\/([a-f0-9-]+)$/);
+   if(planMatch&&request.method==="POST") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const b=await body(request),existing=await env.DB.prepare("SELECT * FROM diet_plans WHERE id=?").bind(planMatch[1]).first();
+    if(!existing)return json({success:false,message:"Diet chart not found."},404,headers);
+    if(existing.dietitian_user_id!==session.user_id&&!session.is_platform_admin)return json({success:false,message:"Only the assigned dietitian can edit this chart."},403,headers);
+    const member=session.memberships.find(m=>m.practice_id===existing.practice_id&&m.role==="dietitian"&&m.status==="active");
+    if(!member&&!session.is_platform_admin)return json({success:false,message:"Active dietitian membership required."},403,headers);
+    const version=existing.current_version+1,status=b.publish===true?"published":clean(b.status,20)==="archived"?"archived":"draft";
+    await env.DB.prepare("INSERT INTO diet_plan_versions(id,plan_id,version_number,plan_json,notes,published_at,created_by_user_id) VALUES(?,?,?,?,?,?,?)").bind(id(),existing.id,version,JSON.stringify(b.plan&&typeof b.plan==="object"?b.plan:{}),clean(b.notes,3000),status==="published"?now():null,session.user_id).run();
+    await env.DB.prepare("UPDATE diet_plans SET title=?,status=?,current_version=?,updated_at=? WHERE id=?").bind(clean(b.title,160)||existing.title,status,version,now(),existing.id).run();
+    await audit(env,session.user_id,existing.practice_id,"diet_plan.updated","diet_plan",existing.id,{version,status});
+    return json({success:true,message:status==="published"?"Diet chart published to the client.":"Diet chart updated.",version},200,headers);
+   }
+   if(path==="/dietitian/conversations"&&request.method==="GET") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const practiceId=clean(url.searchParams.get("practice_id"),80),clientId=clean(url.searchParams.get("client_user_id"),80);
+    const rows=await env.DB.prepare("SELECT c.id,c.practice_id,c.client_user_id,c.dietitian_user_id,c.status,c.updated_at,cu.display_name AS client_name,du.display_name AS dietitian_name FROM conversations c JOIN app_users cu ON cu.id=c.client_user_id LEFT JOIN app_users du ON du.id=c.dietitian_user_id WHERE c.practice_id=? AND (c.client_user_id=? OR c.dietitian_user_id=?) AND (?='' OR c.client_user_id=?) AND c.status='open' ORDER BY c.updated_at DESC LIMIT 100").bind(practiceId,session.user_id,session.user_id,clientId,clientId).all();
+    return json({success:true,conversations:rows.results||[]},200,headers);
+   }
+   if(path==="/dietitian/messages"&&request.method==="GET") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const conversationId=clean(url.searchParams.get("conversation_id"),80);
+    const convo=await env.DB.prepare("SELECT * FROM conversations WHERE id=? AND (client_user_id=? OR dietitian_user_id=?)").bind(conversationId,session.user_id,session.user_id).first();
+    if(!convo)return json({success:false,message:"Conversation not found."},404,headers);
+    const rows=await env.DB.prepare("SELECT m.id,m.sender_user_id,m.body,m.created_at,m.read_at,u.display_name AS sender_name FROM messages m JOIN app_users u ON u.id=m.sender_user_id WHERE m.conversation_id=? ORDER BY m.created_at ASC LIMIT 500").bind(conversationId).all();
+    await env.DB.prepare("UPDATE messages SET read_at=? WHERE conversation_id=? AND sender_user_id<>? AND read_at IS NULL").bind(now(),conversationId,session.user_id).run();
+    return json({success:true,messages:rows.results||[]},200,headers);
+   }
+   if(path==="/dietitian/messages"&&request.method==="POST") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const b=await body(request),conversationId=clean(b.conversation_id,80),text=clean(b.body,4000);
+    if(!text)return json({success:false,message:"Write a message first."},400,headers);
+    const convo=await env.DB.prepare("SELECT * FROM conversations WHERE id=? AND status='open' AND (client_user_id=? OR dietitian_user_id=?)").bind(conversationId,session.user_id,session.user_id).first();
+    if(!convo)return json({success:false,message:"Open conversation not found."},404,headers);
+    const messageId=id();await env.DB.prepare("INSERT INTO messages(id,conversation_id,sender_user_id,body) VALUES(?,?,?,?)").bind(messageId,conversationId,session.user_id,text).run();
+    await env.DB.prepare("UPDATE conversations SET updated_at=? WHERE id=?").bind(now(),conversationId).run();
+    return json({success:true,message_id:messageId},201,headers);
+   }
+   if(path==="/dietitian/appointments"&&request.method==="GET") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const practiceId=clean(url.searchParams.get("practice_id"),80);
+    const rows=await env.DB.prepare("SELECT a.*,cu.display_name AS client_name,du.display_name AS dietitian_name FROM appointments a JOIN app_users cu ON cu.id=a.client_user_id LEFT JOIN app_users du ON du.id=a.dietitian_user_id WHERE a.practice_id=? AND (a.client_user_id=? OR a.dietitian_user_id=?) ORDER BY a.starts_at DESC LIMIT 200").bind(practiceId,session.user_id,session.user_id).all();
+    return json({success:true,appointments:rows.results||[]},200,headers);
+   }
+   if(path==="/dietitian/appointments"&&request.method==="POST") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const b=await body(request),practiceId=clean(b.practice_id,80),clientId=clean(b.client_user_id,80),starts=clean(b.starts_at,40),ends=clean(b.ends_at,40),notes=clean(b.notes,1000);
+    const member=session.memberships.find(m=>m.practice_id===practiceId&&m.role==="dietitian"&&m.status==="active");
+    if(!member&&!session.is_platform_admin)return json({success:false,message:"Active dietitian membership required."},403,headers);
+    if(!Number.isFinite(Date.parse(starts))||!Number.isFinite(Date.parse(ends))||Date.parse(ends)<=Date.parse(starts))return json({success:false,message:"Choose a valid start and end time."},400,headers);
+    const connected=await env.DB.prepare("SELECT 1 AS ok FROM dietitian_requests WHERE practice_id=? AND client_user_id=? AND dietitian_user_id=? AND status='accepted' UNION SELECT 1 AS ok FROM client_profiles WHERE practice_id=? AND user_id=? AND assigned_dietitian_user_id=? LIMIT 1").bind(practiceId,clientId,session.user_id,practiceId,clientId,session.user_id).first();
+    if(!connected)return json({success:false,message:"Only connected clients can be scheduled."},403,headers);
+    const conflict=await env.DB.prepare("SELECT 1 AS conflict FROM appointments WHERE practice_id=? AND dietitian_user_id=? AND status IN ('requested','confirmed') AND starts_at<? AND ends_at>? LIMIT 1").bind(practiceId,session.user_id,ends,starts).first();
+    if(conflict)return json({success:false,message:"This time overlaps another appointment."},409,headers);
+    const appointmentId=id();await env.DB.prepare("INSERT INTO appointments(id,practice_id,client_user_id,dietitian_user_id,starts_at,ends_at,status,notes) VALUES(?,?,?,?,?,?,'confirmed',?)").bind(appointmentId,practiceId,clientId,session.user_id,starts,ends,notes).run();
+    await audit(env,session.user_id,practiceId,"appointment.scheduled","appointment",appointmentId);
+    return json({success:true,appointment_id:appointmentId,message:"Appointment scheduled."},201,headers);
+   }
+
    if(path==="/admin/applicants"&&request.method==="GET") {
     if(!session?.is_platform_admin)return json({success:false,message:"Platform administrator access required."},session?403:401,headers);
     const rows=await env.DB.prepare("SELECT u.id AS user_id,u.display_name,u.email,u.created_at,u.account_type, (SELECT COUNT(*) FROM practice_memberships m WHERE m.user_id=u.id AND m.status='active') AS active_memberships FROM app_users u WHERE u.account_type='dietitian' ORDER BY u.created_at DESC LIMIT 300").all();

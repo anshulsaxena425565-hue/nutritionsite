@@ -292,9 +292,9 @@ export default {
    if(path==="/client/diet-plans"&&request.method==="GET") {
     if(!session)return json({success:false,message:"Sign in required."},401,headers);
     const practiceId=clean(url.searchParams.get("practice_id"),80);
-    const member=session.memberships.find(m=>m.practice_id===practiceId&&m.role==="client"&&m.status==="active");
-    if(!member&&!session.is_platform_admin)return json({success:false,message:"Client membership required."},403,headers);
-    const rows=await env.DB.prepare("SELECT id,practice_id,client_user_id,dietitian_user_id,title,status,current_version,created_at,updated_at FROM diet_plans WHERE practice_id=? AND client_user_id=? AND status='published' ORDER BY updated_at DESC LIMIT 100").bind(practiceId,session.user_id).all();
+    // Clients can view only their own published plans. A client membership is not
+    // required when a dietitian has connected the client through an accepted request.
+    const rows=await env.DB.prepare("SELECT dp.id,dp.practice_id,dp.client_user_id,dp.dietitian_user_id,dp.title,dp.status,dp.current_version,dp.created_at,dp.updated_at,p.name AS practice_name,u.display_name AS dietitian_name FROM diet_plans dp JOIN practices p ON p.id=dp.practice_id LEFT JOIN app_users u ON u.id=dp.dietitian_user_id WHERE (?='' OR dp.practice_id=?) AND dp.client_user_id=? AND dp.status='published' AND p.status='active' ORDER BY dp.updated_at DESC LIMIT 100").bind(practiceId,practiceId,session.user_id).all();
     const plans=[];for(const p of rows.results||[]){const v=await env.DB.prepare("SELECT plan_json,notes,version_number,published_at FROM diet_plan_versions WHERE plan_id=? AND version_number=?").bind(p.id,p.current_version).first();plans.push({...p,plan:v?JSON.parse(v.plan_json||"{}"):{},notes:v?.notes||"",published_at:v?.published_at||null});}
     return json({success:true,plans},200,headers);
    }

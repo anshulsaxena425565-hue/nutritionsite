@@ -12,11 +12,11 @@ const ROUTES = new Set([
 
 export default function handler(req, res) {
   const path = Array.isArray(req.query?.path) ? req.query.path.join("/") : String(req.query?.path || "");
-  const endpoint = path.replace(/^\\/+|\\/+$/g, "");
+  const endpoint = path.split("/").filter(Boolean).join("/");
   const allowed = endpoint && (ROUTES.has(endpoint) ||
-    /^dietitian\\/requests\\/[a-f0-9-]+\\/decision$/.test(endpoint) ||
-    /^admin\\/practices\\/[a-f0-9-]+\\/status$/.test(endpoint) ||
-    /^admin\\/dietitians\\/[a-f0-9-]+\\/verification$/.test(endpoint));
+    new RegExp("^dietitian/requests/[a-f0-9-]+/decision$").test(endpoint) ||
+    new RegExp("^admin/practices/[a-f0-9-]+/status$").test(endpoint) ||
+    new RegExp("^admin/dietitians/[a-f0-9-]+/verification$").test(endpoint));
   if (!allowed) return res.status(404).json({success:false,message:"API route not found.",path:"/"+endpoint});
   return proxy(req, res, "/"+endpoint);
 }

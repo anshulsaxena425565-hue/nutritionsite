@@ -5,9 +5,9 @@ const ROUTES = new Set([
   "dietitians/directory", "dietitian/patients", "dietitian/plans",
   "dietitian/conversations", "dietitian/messages", "dietitian/appointments",
   "client/diet-plans", "dietitian/profile", "dietitian/requests",
-  "admin/practices", "admin/dietitians", "admin/applicants", "admin/applicants/approve",
+  "admin/practices", "admin/dietitians", "admin/applicants", "admin/applicants/approve", "admin/users",
   "practice/members", "practice/invitations", "practice/invitations/accept",
-  "admin/dietitians/verification"
+
 ]);
 
 export default function handler(req, res) {
@@ -16,7 +16,8 @@ export default function handler(req, res) {
   const allowed = endpoint && (ROUTES.has(endpoint) ||
     new RegExp("^dietitian/requests/[a-f0-9-]+/decision$").test(endpoint) ||
     new RegExp("^admin/practices/[a-f0-9-]+/status$").test(endpoint) ||
-    new RegExp("^admin/dietitians/[a-f0-9-]+/verification$").test(endpoint));
+    new RegExp("^admin/users/[a-f0-9-]+$").test(endpoint) ||
+    new RegExp("^admin/users/[a-f0-9-]+/status$").test(endpoint));
   if (!allowed) return res.status(404).json({success:false,message:"API route not found.",path:"/"+endpoint});
   return proxy(req, res, "/"+endpoint);
 }

@@ -153,7 +153,7 @@ export default {
       const rows=await env.DB.prepare("SELECT u.id AS user_id,u.display_name,u.email,u.phone,u.account_type,u.status,u.created_at,(SELECT COUNT(*) FROM practice_memberships m WHERE m.user_id=u.id AND m.status='active') AS active_memberships,(SELECT GROUP_CONCAT(DISTINCT p.name) FROM practice_memberships m JOIN practices p ON p.id=m.practice_id WHERE m.user_id=u.id) AS practices,(SELECT COUNT(*) FROM dietitian_requests r WHERE r.client_user_id=u.id OR r.dietitian_user_id=u.id) AS consultation_count,(SELECT COUNT(*) FROM diet_plans dp WHERE dp.client_user_id=u.id OR dp.dietitian_user_id=u.id) AS diet_plan_count FROM app_users u WHERE (?='' OR lower(u.display_name) LIKE '%'||?||'%' OR lower(u.email) LIKE '%'||?||'%' OR u.phone LIKE '%'||?||'%') AND (?='' OR u.account_type=?) AND (?='' OR u.status=?) ORDER BY u.created_at DESC LIMIT 500").bind(q,q,q,q,type,type,status,status).all();
       return json({success:true,users:rows.results||[]},200,headers);
    }
-   const adminUserStatus=path.match(/^\\/admin\\/users\\/([a-f0-9-]+)\\/status$/);
+   const adminUserStatus=path.match(/^\/admin\/users\/([a-f0-9-]+)\/status$/);
    if(adminUserStatus&&request.method==="POST") {
       const targetId=adminUserStatus[1],b=await body(request),status=clean(b.status,20);
       if(!["active","suspended"].includes(status))return json({success:false,message:"Choose active or suspended."},400,headers);
@@ -165,7 +165,7 @@ export default {
       await audit(env,session.user_id,null,"admin.user_status_changed","user",targetId,{status,previous_status:target.status});
       return json({success:true,message:"User "+status+".",status},200,headers);
    }
-   const adminUserDetail=path.match(/^\\/admin\\/users\\/([a-f0-9-]+)$/);
+   const adminUserDetail=path.match(/^\/admin\/users\/([a-f0-9-]+)$/);
    if(adminUserDetail&&request.method==="GET") {
       const targetId=adminUserDetail[1],target=await env.DB.prepare("SELECT id AS user_id,display_name,email,phone,account_type,status,created_at FROM app_users WHERE id=?").bind(targetId).first();
       if(!target)return json({success:false,message:"User not found."},404,headers);

@@ -1,5 +1,6 @@
 import React,{useEffect,useState} from 'react';
-import{createPortal,createRoot}from'react-dom/client';
+import{createPortal}from'react-dom';
+import{createRoot}from'react-dom/client';
 import{Activity,ArrowRight,CalendarClock,MessageCircle,Utensils,BadgeCheck,Bell,BriefcaseMedical,Check,ChevronDown,CircleHelp,ClipboardList,Filter,HeartPulse,LayoutDashboard,LogOut,Menu,Plus,RefreshCw,Search,Settings,ShieldCheck,SlidersHorizontal,Sparkles,UserRound,Users,X}from'lucide-react';
 import'./styles.css';
 const API='/api/platform';

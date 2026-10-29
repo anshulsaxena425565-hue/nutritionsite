@@ -289,6 +289,15 @@ export default {
     const rows=await env.DB.prepare("SELECT cp.user_id AS client_user_id,cp.preferred_name,cp.date_of_birth,cp.onboarding_status,u.display_name,u.email,cp.practice_id,p.name AS practice_name,cp.created_at,(SELECT COUNT(*) FROM diet_plans dp WHERE dp.practice_id=cp.practice_id AND dp.client_user_id=cp.user_id AND dp.dietitian_user_id=? AND dp.status!='archived') AS plan_count,(SELECT MAX(a.starts_at) FROM appointments a WHERE a.practice_id=cp.practice_id AND a.client_user_id=cp.user_id AND a.dietitian_user_id=?) AS next_appointment FROM client_profiles cp JOIN app_users u ON u.id=cp.user_id JOIN practices p ON p.id=cp.practice_id WHERE cp.practice_id=? AND (cp.assigned_dietitian_user_id=? OR EXISTS(SELECT 1 FROM dietitian_requests r WHERE r.practice_id=cp.practice_id AND r.client_user_id=cp.user_id AND r.dietitian_user_id=? AND r.status='accepted')) AND u.status='active' ORDER BY u.display_name LIMIT 300").bind(session.user_id,session.user_id,practiceId,session.user_id,session.user_id).all();
     return json({success:true,patients:rows.results||[]},200,headers);
    }
+   if(path==="/client/diet-plans"&&request.method==="GET") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const practiceId=clean(url.searchParams.get("practice_id"),80);
+    const member=session.memberships.find(m=>m.practice_id===practiceId&&m.role==="client"&&m.status==="active");
+    if(!member&&!session.is_platform_admin)return json({success:false,message:"Client membership required."},403,headers);
+    const rows=await env.DB.prepare("SELECT id,practice_id,client_user_id,dietitian_user_id,title,status,current_version,created_at,updated_at FROM diet_plans WHERE practice_id=? AND client_user_id=? AND status='published' ORDER BY updated_at DESC LIMIT 100").bind(practiceId,session.user_id).all();
+    const plans=[];for(const p of rows.results||[]){const v=await env.DB.prepare("SELECT plan_json,notes,version_number,published_at FROM diet_plan_versions WHERE plan_id=? AND version_number=?").bind(p.id,p.current_version).first();plans.push({...p,plan:v?JSON.parse(v.plan_json||"{}"):{},notes:v?.notes||"",published_at:v?.published_at||null});}
+    return json({success:true,plans},200,headers);
+   }
    if(path==="/dietitian/plans"&&request.method==="GET") {
     if(!session)return json({success:false,message:"Sign in required."},401,headers);
     const clientId=clean(url.searchParams.get("client_user_id"),80),practiceId=clean(url.searchParams.get("practice_id"),80);

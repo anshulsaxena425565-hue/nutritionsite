@@ -494,11 +494,20 @@ body{font-size:15px}
 
 
 /* IFCT 2017 food lookup in the diet plan builder */
-.diet-food-lookup-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 20px;padding:16px 18px;border:1px solid #dfe4ff;border-radius:15px;background:linear-gradient(115deg,#f6f7ff,#fbfcff)}
-.diet-food-lookup-copy{display:flex;align-items:center;gap:12px;min-width:0}
-.diet-food-lookup-icon{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:13px;background:#e8eaff;color:#252d82;font-size:28px;font-weight:700}
-.diet-food-lookup-copy strong{display:block;color:#202858;font-size:14px}
-.diet-food-lookup-copy small{display:block;margin-top:4px;color:#68728a;font-size:12px;line-height:1.5}
-.diet-food-lookup-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;flex-shrink:0;padding:11px 14px;border:0;border-radius:10px;background:#202878;color:#fff;font:600 13px inherit;cursor:pointer;box-shadow:0 3px 9px #20287820}
-.diet-food-lookup-button:hover{background:#303b92;transform:translateY(-1px)}
-@media(max-width:620px){.diet-food-lookup-bar{align-items:stretch;flex-direction:column}.diet-food-lookup-button{width:100%}}
+.diet-food-lookup-bar{position:relative;isolation:isolate;display:flex;align-items:center;justify-content:space-between;gap:18px;margin:0 0 20px;padding:18px 20px;border:1px solid #d7dcff;border-radius:18px;background:radial-gradient(circle at 90% 0%,#e4fff5 0,transparent 34%),linear-gradient(115deg,#f2f3ff 0%,#fff8fc 55%,#f4fffb 100%);box-shadow:0 8px 24px #29368c0a;overflow:hidden}
+.diet-food-lookup-copy{display:flex;align-items:center;gap:14px;min-width:0}
+.diet-food-lookup-icon{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;border-radius:15px;background:linear-gradient(145deg,#272f91,#6e64dc);color:#fff;box-shadow:0 8px 18px #373d9b30}
+.diet-food-lookup-kicker{display:block;margin-bottom:5px;color:#5d63b0;font-size:9px;font-weight:850;letter-spacing:1.1px}
+.diet-food-lookup-copy strong{display:block;color:#171f5d;font-size:16px;letter-spacing:-.25px}
+.diet-food-lookup-copy small{display:block;max-width:580px;margin-top:5px;color:#65708b;font-size:12px;line-height:1.55}
+.diet-food-lookup-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;flex-shrink:0;padding:12px 15px;border:0;border-radius:12px;background:linear-gradient(115deg,#202878,#5146b8);color:#fff;font:700 13px/1.2 inherit;cursor:pointer;box-shadow:0 7px 16px #272e8c25;transition:transform .18s,box-shadow .18s,filter .18s}
+.diet-food-lookup-button:hover{filter:brightness(1.08);transform:translateY(-2px);box-shadow:0 10px 22px #272e8c35}
+.diet-food-lookup-button:focus-visible{outline:3px solid #aeb6ff;outline-offset:3px}
+.tool-modal.ifct-modal{width:min(1020px,100%);max-height:92vh;border:1px solid #e6e8ff;box-shadow:0 35px 110px #10154f55}
+.ifct-modal .tool-modal-head{position:relative;overflow:hidden;padding:25px 28px 22px;background:radial-gradient(circle at 88% 10%,#c7fff0 0,transparent 26%),linear-gradient(115deg,#e8eaff 0%,#fff1f7 56%,#f0fff9 100%);border-bottom:1px solid #e5e7fb}
+.ifct-modal .tool-modal-head:after{content:"";position:absolute;right:100px;top:-42px;width:150px;height:150px;border:22px solid #ffffff65;border-radius:50%;pointer-events:none}
+.ifct-modal .tool-modal-head .tools-eyebrow{display:inline-flex;padding:6px 9px;border-radius:99px;background:#fff9;color:#484bb0;font-size:10px;font-weight:900;letter-spacing:1px}
+.ifct-modal .tool-modal-head h2{font-size:26px;color:#171f5d}
+.ifct-modal .tool-modal-body{background:linear-gradient(180deg,#fff 0%,#fcfcff 100%)}
+.ifct-modal .tool-modal-footer{background:linear-gradient(90deg,#f6f6ff,#f4fffb)}
+@media(max-width:620px){.diet-food-lookup-bar{align-items:stretch;flex-direction:column;padding:16px}.diet-food-lookup-button{width:100%}.diet-food-lookup-copy{align-items:flex-start}.diet-food-lookup-copy strong{font-size:15px}.ifct-modal .tool-modal-head{padding:19px 18px}.ifct-modal .tool-modal-head h2{font-size:21px}.ifct-modal .tool-modal-body{padding:16px}.ifct-modal .tool-modal-footer{padding:12px 16px}}

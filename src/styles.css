@@ -475,3 +475,7 @@ body{font-size:15px}
 .diet-preview-meals li{padding:3px 0;color:#4c5369}
 .diet-plan-preview>footer{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:22px;padding-top:18px;border-top:1px solid #e9ecf5}
 @media(max-width:560px){.diet-plan-preview-backdrop{padding:10px;align-items:flex-end}.diet-plan-preview{padding:18px;border-radius:20px 20px 14px 14px;max-height:90vh}.diet-preview-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.diet-preview-factors{grid-template-columns:1fr}.assigned-plan-actions .btn{flex-basis:100%}.diet-plan-preview>header h2{font-size:21px}}
+
+
+/* Admin customer table pagination */
+.pagination-bar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:15px 2px 2px;color:#858ca0;font-size:14px}.pagination-bar>span b{color:#39415a}.pagination-actions{display:flex;align-items:center;gap:10px}.pagination-actions>span{white-space:nowrap;color:#656d83;font-weight:700}.pagination-actions .btn{display:inline-flex;align-items:center;gap:6px}@media(max-width:640px){.pagination-bar{align-items:flex-start;flex-direction:column}.pagination-actions{width:100%;justify-content:space-between;gap:6px}.pagination-actions>span{font-size:14px}}

@@ -419,3 +419,19 @@ body{font-size:15px}
 .care-workflow-action:focus-visible{outline:3px solid #9ca9ff;outline-offset:2px}
 @media(max-width:1000px){.care-workflow-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.care-workflow-grid{grid-template-columns:1fr}.care-workflow-action{padding:13px}.care-workflow-action b{font-size:13px}}
+
+
+/* Diet Planning Studio — assessment and clinician-controlled calculation assistant */
+.diet-assessment-card{border-color:#deddfb;background:linear-gradient(145deg,#fff 0%,#fcfbff 100%)}
+.diet-step-assist{display:grid;place-items:center;background:#eeedff;color:#5149c4;border-radius:10px}
+.diet-assessment-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0}
+.diet-assessment-grid .field input,.diet-assessment-grid .field select,.diet-factor-grid .field textarea{width:100%;min-width:0}
+.diet-assessment-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px solid #e5e3ff;background:#f7f6ff;padding:13px;border-radius:12px;margin:4px 0 20px}
+.diet-assessment-actions>span{flex:1;min-width:180px;color:#727b91;font-size:12px;line-height:1.6}
+.diet-factor-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:16px}
+.diet-factor-grid .field textarea{resize:vertical;line-height:1.55;min-height:76px}
+.diet-factor-grid .field:last-child{grid-column:1/-1}
+.diet-assessment-card .diet-inline-note{display:flex;align-items:flex-start;gap:8px;margin:17px 0 0;padding:12px 13px;border:1px solid #f0dfb9;border-radius:10px;background:#fffaf0;color:#86611f;font-size:12px;line-height:1.65}
+.diet-assessment-card .diet-inline-note svg{flex-shrink:0;margin-top:1px}
+@media(max-width:900px){.diet-assessment-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.diet-assessment-grid,.diet-factor-grid{grid-template-columns:1fr;gap:12px}.diet-factor-grid .field:last-child{grid-column:auto}.diet-assessment-actions{align-items:stretch}.diet-assessment-actions .btn{width:100%;white-space:normal}.diet-assessment-actions>span{min-width:0}}

@@ -401,3 +401,21 @@ body{font-size:15px}
 .tools-grid>.tool-card{display:flex!important;flex-direction:column!important;grid-column:auto/span 1!important;grid-row:auto!important;justify-self:stretch!important;align-self:stretch!important;width:100%!important;min-width:0!important;max-width:none!important;margin:0!important}
 @media(max-width:1100px){.tools-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 @media(max-width:480px){.tools-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+
+/* Dietitian-first care workflow */
+.care-workflow-panel{margin:0 0 22px;overflow:hidden}
+.care-workflow-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:8px}
+.care-workflow-action{display:flex;align-items:center;gap:12px;min-width:0;text-align:left;padding:15px 13px;border:1px solid #e8eaf4;border-radius:14px;background:linear-gradient(145deg,#fff,#fafaff);color:var(--ink);transition:transform .18s,border-color .18s,box-shadow .18s}
+.care-workflow-action:hover{transform:translateY(-2px);border-color:#c9c7f4;box-shadow:0 8px 22px #252b5010}
+.care-workflow-action>span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:5px;min-width:0}
+.care-workflow-action b{font-size:13px;line-height:1.35}
+.care-workflow-action small{font-size:11px;line-height:1.45;color:var(--muted)}
+.care-workflow-action>svg{flex:0 0 auto;color:#969bb0}
+.care-workflow-icon{width:40px;height:40px;display:grid;place-items:center;flex:0 0 40px;border-radius:12px}
+.care-blue{background:#edf3ff;color:#3d6ed9}.care-purple{background:#f2efff;color:#6556cc}.care-green{background:#eaf8f1;color:#168463}.care-orange{background:#fff3e8;color:#c77a35}
+.care-workflow-principle{display:flex;align-items:flex-start;gap:9px;margin-top:14px;padding:12px 14px;border-radius:11px;background:#f2f7ff;color:#53617c;font-size:12px;line-height:1.55}
+.care-workflow-principle>svg{flex:0 0 auto;color:#3d6ed9;margin-top:1px}
+.care-workflow-principle b{color:#27385c}
+.care-workflow-action:focus-visible{outline:3px solid #9ca9ff;outline-offset:2px}
+@media(max-width:1000px){.care-workflow-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.care-workflow-grid{grid-template-columns:1fr}.care-workflow-action{padding:13px}.care-workflow-action b{font-size:13px}}

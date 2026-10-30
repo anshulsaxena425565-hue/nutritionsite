@@ -435,3 +435,15 @@ body{font-size:15px}
 .diet-assessment-card .diet-inline-note svg{flex-shrink:0;margin-top:1px}
 @media(max-width:900px){.diet-assessment-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.diet-assessment-grid,.diet-factor-grid{grid-template-columns:1fr;gap:12px}.diet-factor-grid .field:last-child{grid-column:auto}.diet-assessment-actions{align-items:stretch}.diet-assessment-actions .btn{width:100%;white-space:normal}.diet-assessment-actions>span{min-width:0}}
+
+/* Keep assigned patient plans visibly distinct from reusable templates. */
+.diet-library-assigned{margin:8px 0 30px;padding:20px;border:1px solid #e2e6f3;border-radius:18px;background:linear-gradient(180deg,#fbfcff 0%,#fff 100%)}
+.diet-library-subhead{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 0 16px}
+.diet-library-subhead h3{margin:0;color:#202858;font-size:18px;letter-spacing:-.25px}
+.diet-library-subhead p{margin:5px 0 0;color:#707990;font-size:13px;line-height:1.5}
+.assigned-plan-card{position:relative}
+.assigned-plan-patient{display:flex;align-items:center;gap:6px;color:#5b6590!important;font-weight:600}
+.assigned-plan-date{display:block;margin-top:12px;color:#7b8398;font-size:12px}
+.compact-library-empty{margin-bottom:20px;padding:26px 16px}
+.templates-subhead{padding-top:22px;border-top:1px solid #e7eaf3}
+@media(max-width:600px){.diet-library-assigned{padding:14px}.diet-library-subhead{align-items:flex-start;flex-wrap:wrap}.diet-library-subhead>.btn{width:100%;justify-content:center}.templates-subhead{padding-top:18px}}

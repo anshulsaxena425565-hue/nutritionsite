@@ -500,7 +500,7 @@ body{font-size:15px}
 .diet-food-lookup-kicker{display:block;margin-bottom:5px;color:#5d63b0;font-size:9px;font-weight:850;letter-spacing:1.1px}
 .diet-food-lookup-copy strong{display:block;color:#171f5d;font-size:16px;letter-spacing:-.25px}
 .diet-food-lookup-copy small{display:block;max-width:580px;margin-top:5px;color:#65708b;font-size:12px;line-height:1.55}
-.diet-food-lookup-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;flex-shrink:0;padding:12px 15px;border:0;border-radius:12px;background:linear-gradient(115deg,#202878,#5146b8);color:#fff;font:700 13px/1.2 inherit;cursor:pointer;box-shadow:0 7px 16px #272e8c25;transition:transform .18s,box-shadow .18s,filter .18s}
+.diet-food-lookup-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;flex-shrink:0;padding:12px 15px;border:0;border-radius:12px;background:linear-gradient(115deg,#202878,#5146b8);color:#fff;font:inherit;font-size:13px;font-weight:700;line-height:1.2;cursor:pointer;box-shadow:0 7px 16px #272e8c25;transition:transform .18s,box-shadow .18s,filter .18s}
 .diet-food-lookup-button:hover{filter:brightness(1.08);transform:translateY(-2px);box-shadow:0 10px 22px #272e8c35}
 .diet-food-lookup-button:focus-visible{outline:3px solid #aeb6ff;outline-offset:3px}
 .tool-modal.ifct-modal{width:min(1020px,100%);max-height:92vh;border:1px solid #e6e8ff;box-shadow:0 35px 110px #10154f55}

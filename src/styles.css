@@ -766,3 +766,16 @@ body{font-size:15px}
 .plan-entitlement input:focus-visible+.plan-entitlement-toggle{outline:3px solid #a9b3ff;outline-offset:2px}
 .plan-entitlements-foot{display:flex;align-items:center;gap:7px;margin-top:13px;color:#656b86;font-size:11px;line-height:1.5}
 @media(max-width:700px){.plan-entitlements{padding:13px}.plan-entitlements-heading{flex-direction:column}.plan-entitlements-grid{grid-template-columns:1fr}.plan-entitlements-actions{width:100%}.plan-entitlements-actions button{flex:1}}
+
+
+/* Superadmin plan editor: focused modal instead of expanding inside the catalogue */
+.billing-plan-modal-backdrop{position:fixed;inset:0;z-index:1200;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(18,22,54,.48);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);overflow-y:auto;}
+.billing-plan-modal-backdrop .billing-plan-full-editor{width:min(860px,100%);max-height:min(88vh,980px);overflow-y:auto;margin:auto;padding:24px;border:1px solid #e1e5f3;border-radius:22px;background:#fff;box-shadow:0 28px 90px rgba(20,27,75,.25);overscroll-behavior:contain;}
+.billing-plan-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:0 0 18px;margin:0 0 20px;border-bottom:1px solid #edf0f8;}
+.billing-plan-modal-head h3{margin:5px 0 4px;color:#171d4b;font-size:22px;letter-spacing:-.03em;}
+.billing-plan-modal-head p{margin:0;color:#737994;font-size:13px;line-height:1.5;}
+.billing-plan-modal-close{display:grid;place-items:center;width:40px;height:40px;flex-shrink:0;border:1px solid #e4e7f2;border-radius:12px;background:#f8f9fd;color:#515879;cursor:pointer;}
+.billing-plan-modal-close:hover{background:#eef0ff;color:#171d4b;}
+.billing-plan-modal-backdrop .billing-form-grid,.billing-plan-modal-backdrop .billing-pricing-period-grid{gap:16px;}
+.billing-plan-modal-backdrop .billing-plan-editor-note{margin-top:18px;}
+@media(max-width:700px){.billing-plan-modal-backdrop{align-items:flex-start;padding:10px;}.billing-plan-modal-backdrop .billing-plan-full-editor{max-height:calc(100dvh - 20px);padding:17px;border-radius:17px;}.billing-plan-modal-head h3{font-size:19px;}}

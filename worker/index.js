@@ -158,7 +158,7 @@ export default {
    const session=await getSession(request,env);
    // Entitlement switches are enforced server-side for mapped dietitian API features.
    // Keep the platform administrator exempt so they can always support and inspect accounts.
-   const requiredPlanFeature=PLAN_FEATURE_PATHS[path];
+   const requiredPlanFeature=PLAN_FEATURE_PATHS[path]||(path.startsWith("/dietitian/requests/")?"patient_management":path.startsWith("/dietitian/patients/")?"patient_management":path.startsWith("/practice/invitations/")?"team_collaboration":null);
    if(session?.account_type==="dietitian"&&!session.is_platform_admin&&requiredPlanFeature){
     const access=await env.DB.prepare("SELECT s.status,s.trial_ends_at,s.current_period_end,p.entitlements_json FROM dietitian_subscriptions s JOIN subscription_plans p ON p.id=s.plan_id WHERE s.user_id=?").bind(session.user_id).first();
     if(access&&["trialing","active","comped"].includes(access.status)){

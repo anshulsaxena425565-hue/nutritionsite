@@ -149,6 +149,8 @@ function AdminReadablePlan({plan,notes}){
  const pretty=v=>{if(empty(v))return "Not specified";if(typeof v==="boolean")return v?"Yes":"No";if(typeof v==="object")return "";return String(v)};
  const mealKeys=["meals","meal_plan","meal_schedule","daily_meals","schedule","mealplan","diet_chart","diet_chart_plan","food_chart","daily_diet_chart"];
  const isMealKey=k=>mealKeys.includes(String(k).toLowerCase().replace(/[ -]/g,"_"));
+ const macroKeys=["energy","energy_kcal","calories","kcal","total_calories","protein","protein_g","carbohydrate","carbohydrates","carbohydrate_g","carbs","carbs_g","fat","fat_g","total_fat","fibre","fiber","fibre_g","fiber_g","water","water_l"];
+ const isMacro=k=>macroKeys.includes(String(k).toLowerCase().replace(/[ -]/g,"_"));
  const renderValue=(label,v,path="root",depth=0)=>{
   v=parse(v);
   if(empty(v))return <article key={path} className="arp-field"><small>{human(label)}</small><p>Not specified</p></article>;
@@ -163,8 +165,14 @@ function AdminReadablePlan({plan,notes}){
  };
  const notesValue=parse(notes);
  const planMissing=parsed===undefined||parsed===null||parsed==="";
+ const entries=parsed&&typeof parsed==="object"&&!Array.isArray(parsed)?Object.entries(parsed):[];
+ const macros=entries.filter(([k,v])=>isMacro(k)&&!empty(v)&&(typeof v!=="object"));
+ const rest=entries.filter(([k])=>!isMacro(k));
  return <div className="admin-readable-plan">
-  {planMissing?<p className="arp-empty">No saved plan content is available for this version.</p>:typeof parsed==="object"?<>{Object.entries(parsed).map(([k,v])=>renderValue(k,v,"plan-"+k))}</>:<section className="arp-section"><h4>Plan details</h4><p className="arp-text">{String(parsed)}</p></section>}
+  {planMissing?<p className="arp-empty">No saved plan content is available for this version.</p>:typeof parsed==="object"&&!Array.isArray(parsed)?<>
+   {macros.length>0&&<section className="arp-section"><h4>Nutrition targets</h4><div className="arp-targets">{macros.map(([k,v])=><article key={k}><small>{human(k)}</small><b>{pretty(v)}{/(energy|calories|kcal)/i.test(k)&&!String(v).toLowerCase().includes("kcal")?" kcal":""}{/(protein|carbohydrate|carbs|fat|fibre|fiber)/i.test(k)&&typeof v==="number"?" g":""}</b></article>)}</div></section>}
+   {rest.map(([k,v])=>renderValue(k,v,"plan-"+k))}
+  </>:<section className="arp-section"><h4>Plan details</h4><p className="arp-text">{String(parsed)}</p></section>}
   {!empty(notesValue)&&<section className="arp-section"><h4>Dietitian notes</h4>{typeof notesValue==="object"?<div className="arp-fields">{Object.entries(notesValue).map(([k,v])=>renderValue(k,v,"notes-"+k))}</div>:<p className="arp-text">{String(notesValue)}</p>}</section>}
  </div>
 }

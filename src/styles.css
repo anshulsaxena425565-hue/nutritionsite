@@ -742,3 +742,27 @@ body{font-size:15px}
 .billing-empty-state b{color:var(--text,#172033)}
 @media(max-width:760px){.billing-catalogue-toolbar{align-items:stretch}.billing-plan-search{max-width:none}.billing-form-grid{grid-template-columns:1fr}.billing-pricing-period-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.billing-catalogue-actions{width:100%}.billing-catalogue-actions .btn{flex:1;justify-content:center}}
 @media(max-width:420px){.billing-pricing-period-grid{grid-template-columns:1fr}.billing-plan-card-actions button{flex:1;justify-content:center}}
+
+
+/* Per-plan entitlement controls: actual access switches, separate from marketing copy. */
+.plan-entitlements{margin:18px 0;padding:18px;border:1px solid #e1e4fb;border-radius:18px;background:linear-gradient(145deg,#f8f8ff,#fff)}
+.plan-entitlements-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px}
+.plan-entitlements-heading h4{margin:0 0 5px;color:#151a48;font-size:15px}
+.plan-entitlements-heading p{margin:0;color:#70758e;font-size:12px;line-height:1.5}
+.plan-entitlements-actions{display:flex;gap:6px;flex-shrink:0}
+.plan-entitlements-actions button{border:1px solid #d9dcf4;border-radius:9px;background:#fff;color:#272d78;padding:7px 10px;font-size:11px;font-weight:700;cursor:pointer}
+.plan-entitlements-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.plan-entitlement{position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:67px;padding:12px 13px;border:1px solid #e4e6f2;border-radius:13px;background:#fff;cursor:pointer;transition:border-color .18s,background .18s}
+.plan-entitlement.enabled{border-color:#c9e8dc;background:#fbfffd}
+.plan-entitlement.disabled{border-color:#e7dff4;background:#fbf9ff}
+.plan-entitlement-copy{display:flex;flex-direction:column;gap:4px;min-width:0}
+.plan-entitlement-copy b{color:#23264d;font-size:12px}
+.plan-entitlement-copy small{color:#777b91;font-size:10px;line-height:1.45}
+.plan-entitlement input{position:absolute;opacity:0;width:1px;height:1px}
+.plan-entitlement-toggle{width:36px;height:21px;flex-shrink:0;border-radius:99px;background:#d6d8e5;position:relative;transition:background .18s}
+.plan-entitlement-toggle:after{content:"";position:absolute;left:3px;top:3px;width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0002;transition:transform .18s}
+.plan-entitlement input:checked+.plan-entitlement-toggle{background:#2d9d78}
+.plan-entitlement input:checked+.plan-entitlement-toggle:after{transform:translateX(15px)}
+.plan-entitlement input:focus-visible+.plan-entitlement-toggle{outline:3px solid #a9b3ff;outline-offset:2px}
+.plan-entitlements-foot{display:flex;align-items:center;gap:7px;margin-top:13px;color:#656b86;font-size:11px;line-height:1.5}
+@media(max-width:700px){.plan-entitlements{padding:13px}.plan-entitlements-heading{flex-direction:column}.plan-entitlements-grid{grid-template-columns:1fr}.plan-entitlements-actions{width:100%}.plan-entitlements-actions button{flex:1}}

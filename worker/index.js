@@ -145,9 +145,73 @@ export default {
     return json({success:true,message:"Super Admin allowlisted. Sign in using email code."},201,headers);
    }
    const session=await getSession(request,env);
+   if(path==="/billing/plans"&&request.method==="GET") {
+    const rows=await env.DB.prepare("SELECT id,slug,name,description,price_minor,prices_minor_json,patient_limit,is_unlimited,trial_days,features_json,is_active,is_featured,sort_order FROM subscription_plans WHERE is_active=1 ORDER BY sort_order,name").all();
+    return json({success:true,plans:(rows.results||[]).map(p=>({...p,prices_minor:JSON.parse(p.prices_minor_json||"{}"),features:JSON.parse(p.features_json||"[]"),is_active:!!p.is_active,is_unlimited:!!p.is_unlimited,is_featured:!!p.is_featured}))},200,headers);
+   }
+   if(path==="/billing/status"&&request.method==="GET") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    if(session.account_type!=="dietitian")return json({success:false,message:"Subscriptions are only available for dietitian accounts."},403,headers);
+    let sub=await env.DB.prepare("SELECT s.*,p.slug AS plan_slug,p.name AS plan_name,p.patient_limit,p.is_unlimited,p.price_minor FROM dietitian_subscriptions s JOIN subscription_plans p ON p.id=s.plan_id WHERE s.user_id=?").bind(session.user_id).first();
+    if(!sub){const basic=await env.DB.prepare("SELECT id,trial_days FROM subscription_plans WHERE slug='basic' AND is_active=1").first();if(basic){const start=now(),end=new Date(Date.now()+Number(basic.trial_days||14)*86400000).toISOString();await env.DB.prepare("INSERT OR IGNORE INTO dietitian_subscriptions(id,user_id,plan_id,status,trial_ends_at,current_period_start,current_period_end) VALUES(?,?,?,'trialing',?,?,?)").bind(id(),session.user_id,basic.id,end,start,end).run();sub=await env.DB.prepare("SELECT s.*,p.slug AS plan_slug,p.name AS plan_name,p.patient_limit,p.is_unlimited,p.price_minor FROM dietitian_subscriptions s JOIN subscription_plans p ON p.id=s.plan_id WHERE s.user_id=?").bind(session.user_id).first();}}
+    if(sub&&sub.status==="trialing"&&sub.trial_ends_at&&Date.parse(sub.trial_ends_at)<=Date.now()){await env.DB.prepare("UPDATE dietitian_subscriptions SET status='expired',updated_at=? WHERE id=?").bind(now(),sub.id).run();sub.status="expired";}
+    const count=await env.DB.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM (SELECT client_user_id AS user_id FROM dietitian_requests WHERE dietitian_user_id=? AND status='accepted' UNION SELECT user_id FROM client_profiles WHERE assigned_dietitian_user_id=?)").bind(session.user_id,session.user_id).first();
+    return json({success:true,subscription:sub?{...sub,is_unlimited:!!sub.is_unlimited,locked:!["trialing","active","comped"].includes(sub.status)}:null,patient_count:Number(count?.n||0),locked:!sub||!["trialing","active","comped"].includes(sub.status)},200,headers);
+   }
+   if(path==="/billing/checkout"&&request.method==="POST") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    if(session.account_type!=="dietitian")return json({success:false,message:"Only dietitian accounts can subscribe."},403,headers);
+    const b=await body(request),slug=clean(b.plan_slug,50),plan=await env.DB.prepare("SELECT id,slug,name FROM subscription_plans WHERE slug=? AND is_active=1").bind(slug).first();
+    if(!plan)return json({success:false,message:"This plan is unavailable. Refresh the plan catalogue."},404,headers);
+    await audit(env,session.user_id,null,"billing.checkout_unavailable","subscription_plan",plan.id,{slug:plan.slug});
+    return json({success:false,message:"Online payments are not enabled yet. No payment was taken and your subscription was not changed."},501,headers);
+   }
    if(path.startsWith("/admin/")) {
     if(!session?.is_platform_admin) return json({success:false,message:"Platform administrator access required."},session?403:401,headers);
  
+   if(path==="/admin/billing/overview"&&request.method==="GET") {
+    const plans=await env.DB.prepare("SELECT id,slug,name,description,price_minor,prices_minor_json,patient_limit,is_unlimited,trial_days,features_json,is_active,is_featured,sort_order,created_at,updated_at FROM subscription_plans ORDER BY sort_order,name").all();
+    const subscriptions=await env.DB.prepare("SELECT s.id,s.user_id,u.display_name,u.email,s.status,s.trial_ends_at,s.current_period_start,s.current_period_end,s.admin_override,s.override_reason,p.slug AS plan_slug,p.name AS plan_name FROM dietitian_subscriptions s JOIN app_users u ON u.id=s.user_id JOIN subscription_plans p ON p.id=s.plan_id ORDER BY s.updated_at DESC LIMIT 500").all();
+    const stats=await env.DB.prepare("SELECT (SELECT COUNT(*) FROM app_users WHERE account_type='dietitian' AND status='active') AS dietitians,(SELECT COUNT(*) FROM dietitian_subscriptions WHERE status='trialing' AND (trial_ends_at IS NULL OR trial_ends_at>?)) AS trialing,(SELECT COUNT(*) FROM dietitian_subscriptions WHERE status IN ('active','comped')) AS active,(SELECT COUNT(*) FROM dietitian_subscriptions WHERE status IN ('expired','suspended','cancelled') OR (status='trialing' AND trial_ends_at<=?)) AS expired").bind(now(),now()).first();
+    return json({success:true,plans:(plans.results||[]).map(p=>({...p,prices_minor:JSON.parse(p.prices_minor_json||"{}"),features:JSON.parse(p.features_json||"[]"),is_active:!!p.is_active,is_unlimited:!!p.is_unlimited,is_featured:!!p.is_featured})),subscriptions:subscriptions.results||[],stats:stats||{}},200,headers);
+   }
+   if(path==="/admin/billing/plans"&&request.method==="POST") {
+    const b=await body(request),action=clean(b.action||"save",20),reason=clean(b.reason||"Plan catalogue updated by Superadmin",500);
+    if(action==="delete"){
+     const planId=clean(b.id,80),slug=clean(b.slug,50),plan=planId?await env.DB.prepare("SELECT id,slug,name FROM subscription_plans WHERE id=?").bind(planId).first():await env.DB.prepare("SELECT id,slug,name FROM subscription_plans WHERE slug=?").bind(slug).first();
+     if(!plan)return json({success:false,message:"Plan not found."},404,headers);
+     const count=await env.DB.prepare("SELECT COUNT(*) AS n FROM dietitian_subscriptions WHERE plan_id=?").bind(plan.id).first();
+     if(Number(count?.n||0)>0){await env.DB.prepare("UPDATE subscription_plans SET is_active=0,updated_at=? WHERE id=?").bind(now(),plan.id).run();await audit(env,session.user_id,null,"billing.plan_archived","subscription_plan",plan.id,{slug:plan.slug,reason,subscriptions:Number(count.n)});return json({success:true,message:"Subscription history exists, so this plan was safely unpublished and archived."},200,headers);}
+     await env.DB.prepare("DELETE FROM subscription_plans WHERE id=?").bind(plan.id).run();await audit(env,session.user_id,null,"billing.plan_deleted","subscription_plan",plan.id,{slug:plan.slug,reason});return json({success:true,message:"Plan deleted from the catalogue."},200,headers);
+    }
+    if(action!=="save"||!Array.isArray(b.plans)||b.plans.length>100)return json({success:false,message:"Send a valid catalogue of up to 100 plans."},400,headers);
+    const seen=new Set();
+    for(let i=0;i<b.plans.length;i++){
+     const p=b.plans[i]||{},pid=clean(p.id,80)||id(),slug=clean(p.slug,50).toLowerCase(),name=clean(p.name,80),description=clean(p.description,240);
+     if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug))return json({success:false,message:"Plan slugs must use lowercase letters, numbers and hyphens."},400,headers);
+     if(name.length<2)return json({success:false,message:"Every plan needs a name of at least 2 characters."},400,headers);
+     if(seen.has(slug))return json({success:false,message:"Duplicate plan slug: "+slug+"."},400,headers);seen.add(slug);
+     const conflict=await env.DB.prepare("SELECT id FROM subscription_plans WHERE slug=? AND id<>?").bind(slug,pid).first();if(conflict)return json({success:false,message:"The slug “"+slug+"” is already used by another plan."},409,headers);
+     const price=Math.max(0,Math.min(1000000000,Math.round(Number(p.price_minor??0))));if(!Number.isFinite(price))return json({success:false,message:"Enter a valid price for "+name+"."},400,headers);
+     const pr=p.prices_minor&&typeof p.prices_minor==="object"?p.prices_minor:{monthly:price},prices={monthly:price,quarterly:Math.max(0,Math.min(3000000000,Math.round(Number(pr.quarterly||0)))),half_yearly:Math.max(0,Math.min(6000000000,Math.round(Number(pr.half_yearly||0)))),yearly:Math.max(0,Math.min(12000000000,Math.round(Number(pr.yearly||0))))};
+     const limit=Math.max(1,Math.min(1000000,Math.round(Number(p.patient_limit||1)))),trial=Math.max(0,Math.min(365,Math.round(Number(p.trial_days??14)))),features=Array.isArray(p.features)?p.features.map(x=>clean(x,180)).filter(Boolean).slice(0,80):[];
+     await env.DB.prepare("INSERT INTO subscription_plans(id,slug,name,description,price_minor,prices_minor_json,patient_limit,is_unlimited,trial_days,features_json,is_active,is_featured,sort_order,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET slug=excluded.slug,name=excluded.name,description=excluded.description,price_minor=excluded.price_minor,prices_minor_json=excluded.prices_minor_json,patient_limit=excluded.patient_limit,is_unlimited=excluded.is_unlimited,trial_days=excluded.trial_days,features_json=excluded.features_json,is_active=excluded.is_active,is_featured=excluded.is_featured,sort_order=excluded.sort_order,updated_at=excluded.updated_at").bind(pid,slug,name,description,price,JSON.stringify(prices),limit,p.is_unlimited===true?1:0,trial,JSON.stringify(features),p.is_active===false?0:1,p.is_featured===true?1:0,Math.max(0,Math.min(9999,Math.round(Number(p.sort_order||i+1)))),now()).run();
+    }
+    await audit(env,session.user_id,null,"billing.plan_catalogue_saved","subscription_plan",null,{count:b.plans.length,reason});
+    return json({success:true,message:"Plan catalogue saved. Published plans are available to new selections.",count:b.plans.length},200,headers);
+   }
+   if(path==="/admin/billing/subscriptions"&&request.method==="POST") {
+    const b=await body(request),email=clean(b.email,254).toLowerCase(),slug=clean(b.plan_slug,50),status=clean(b.status,20),days=Math.max(1,Math.min(3660,Math.round(Number(b.days||30)))),reason=clean(b.reason,500);
+    if(!emailOk(email)||!reason)return json({success:false,message:"Enter a valid dietitian email and an audit reason."},400,headers);
+    if(!["active","comped","trialing","suspended","cancelled","expired"].includes(status))return json({success:false,message:"Choose a valid subscription status."},400,headers);
+    const user=await env.DB.prepare("SELECT id,email,display_name,account_type,status FROM app_users WHERE email=? COLLATE NOCASE").bind(email).first();
+    if(!user||user.account_type!=="dietitian"||user.status!=="active")return json({success:false,message:"An active dietitian account with that email was not found. Patient accounts cannot be subscribed."},404,headers);
+    const plan=await env.DB.prepare("SELECT id,slug,name FROM subscription_plans WHERE slug=?").bind(slug).first();if(!plan)return json({success:false,message:"Choose an existing plan."},400,headers);
+    const start=now(),end=new Date(Date.now()+days*86400000).toISOString(),trialEnd=status==="trialing"?end:null,override=["comped","suspended","cancelled","expired"].includes(status)?1:0;
+    await env.DB.prepare("INSERT INTO dietitian_subscriptions(id,user_id,plan_id,status,trial_ends_at,current_period_start,current_period_end,admin_override,override_reason,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET plan_id=excluded.plan_id,status=excluded.status,trial_ends_at=excluded.trial_ends_at,current_period_start=excluded.current_period_start,current_period_end=excluded.current_period_end,admin_override=excluded.admin_override,override_reason=excluded.override_reason,updated_at=excluded.updated_at").bind(id(),user.id,plan.id,status,trialEnd,start,end,override,reason,now()).run();
+    const sub=await env.DB.prepare("SELECT id FROM dietitian_subscriptions WHERE user_id=?").bind(user.id).first();await audit(env,session.user_id,null,"billing.subscription_admin_changed","dietitian_subscription",sub?.id,{email:user.email,plan_slug:slug,status,days,reason});
+    return json({success:true,message:"Subscription updated for "+user.display_name+"."},200,headers);
+   }
    if(path==="/admin/users"&&request.method==="GET") {
       const q=clean(url.searchParams.get("q"),120).toLowerCase(),type=clean(url.searchParams.get("type"),20),status=clean(url.searchParams.get("status"),20);
       const rows=await env.DB.prepare("SELECT u.id AS user_id,u.display_name,u.email,u.phone,u.account_type,u.status,u.created_at,(SELECT COUNT(*) FROM practice_memberships m WHERE m.user_id=u.id AND m.status='active') AS active_memberships,(SELECT GROUP_CONCAT(DISTINCT p.name) FROM practice_memberships m JOIN practices p ON p.id=m.practice_id WHERE m.user_id=u.id) AS practices,(SELECT COUNT(*) FROM dietitian_requests r WHERE r.client_user_id=u.id OR r.dietitian_user_id=u.id) AS consultation_count,(SELECT COUNT(*) FROM diet_plans dp WHERE dp.client_user_id=u.id OR dp.dietitian_user_id=u.id) AS diet_plan_count FROM app_users u WHERE (?='' OR lower(u.display_name) LIKE '%'||?||'%' OR lower(u.email) LIKE '%'||?||'%' OR u.phone LIKE '%'||?||'%') AND (?='' OR u.account_type=?) AND (?='' OR u.status=?) ORDER BY u.created_at DESC LIMIT 500").bind(q,q,q,q,type,type,status,status).all();

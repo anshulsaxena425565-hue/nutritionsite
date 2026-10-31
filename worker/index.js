@@ -370,7 +370,19 @@ export default {
     if(!req||req.dietitian_user_id!==session.user_id)return json({success:false,message:"Request not found."},404,headers);
     const membership=session.memberships.find(m=>m.practice_id===req.practice_id&&m.role==="dietitian"&&m.status==="active");
     if(!membership&&!session.is_platform_admin)return json({success:false,message:"Dietitian access required."},403,headers);
-    await env.DB.prepare("UPDATE dietitian_requests SET status=?,updated_at=? WHERE id=?").bind(status,now(),req.id).run();
+    if(status==="accepted"){
+      let sub=await env.DB.prepare("SELECT s.id,s.status,s.trial_ends_at,s.current_period_end,p.patient_limit,p.is_unlimited FROM dietitian_subscriptions s JOIN subscription_plans p ON p.id=s.plan_id WHERE s.user_id=?").bind(session.user_id).first();
+      if(!sub){
+       const basic=await env.DB.prepare("SELECT id,trial_days FROM subscription_plans WHERE slug='basic' AND is_active=1").first();
+       if(basic){const start=now(),end=new Date(Date.now()+Number(basic.trial_days||14)*86400000).toISOString();await env.DB.prepare("INSERT OR IGNORE INTO dietitian_subscriptions(id,user_id,plan_id,status,trial_ends_at,current_period_start,current_period_end) VALUES(?,?,?,'trialing',?,?,?)").bind(id(),session.user_id,basic.id,end,start,end).run();sub=await env.DB.prepare("SELECT s.id,s.status,s.trial_ends_at,s.current_period_end,p.patient_limit,p.is_unlimited FROM dietitian_subscriptions s JOIN subscription_plans p ON p.id=s.plan_id WHERE s.user_id=?").bind(session.user_id).first();}
+      }
+      if(!sub)return json({success:false,message:"No active subscription or trial is available. Please contact Superadmin."},402,headers);
+      if(sub.status==="trialing"&&sub.trial_ends_at&&Date.parse(sub.trial_ends_at)<=Date.now()){await env.DB.prepare("UPDATE dietitian_subscriptions SET status='expired',updated_at=? WHERE id=?").bind(now(),sub.id).run();sub.status="expired";}
+      if(!["trialing","active","comped"].includes(sub.status))return json({success:false,message:"Your plan does not currently allow new patient connections. Contact Superadmin or renew your subscription."},402,headers);
+      const used=await env.DB.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM (SELECT client_user_id AS user_id FROM dietitian_requests WHERE dietitian_user_id=? AND status='accepted' AND id<>? UNION SELECT user_id FROM client_profiles WHERE assigned_dietitian_user_id=? AND user_id<>?)").bind(session.user_id,req.id,session.user_id,req.client_user_id).first();
+      if(!sub.is_unlimited&&Number(used?.n||0)>=Number(sub.patient_limit||1))return json({success:false,message:"This plan's patient limit has been reached. Upgrade the plan or adjust the subscription in Superadmin."},409,headers);
+     }
+     await env.DB.prepare("UPDATE dietitian_requests SET status=?,updated_at=? WHERE id=?").bind(status,now(),req.id).run();
     if(status==="accepted"){
       await env.DB.prepare("INSERT INTO client_profiles(id,practice_id,user_id,assigned_dietitian_user_id) VALUES(?,?,?,?) ON CONFLICT(practice_id,user_id) DO UPDATE SET assigned_dietitian_user_id=excluded.assigned_dietitian_user_id").bind(id(),req.practice_id,req.client_user_id,session.user_id).run();
       await env.DB.prepare("INSERT INTO conversations(id,practice_id,client_user_id,dietitian_user_id,status) VALUES(?,?,?,?,'open')").bind(id(),req.practice_id,req.client_user_id,session.user_id).run();

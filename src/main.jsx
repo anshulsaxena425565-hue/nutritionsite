@@ -53,6 +53,18 @@ function ClientHelpSupport({onNavigate}){
 
 function SubscriptionLock({onReadOnly}){const[plans,setPlans]=useState([]);useEffect(()=>{api('/billing/plans').then(d=>setPlans(d.plans||[])).catch(()=>{})},[]);return <div className="subscription-lock-backdrop" role="dialog" aria-modal="true"><div className="subscription-lock-modal"><h2>Your trial has ended</h2><p>Choose a plan to continue using dietitian tools. Existing overview is available read-only.</p><div className="lock-plan-grid">{plans.map(p=><article className="lock-plan-card" key={p.slug}><h3>{p.name}</h3><div className="lock-price">₹{Math.round(Number(p.price_minor||0)/100)}<small>/month</small></div><p>{p.is_unlimited?'Unlimited patients':'Up to '+p.patient_limit+' patients'}</p><button className="lock-plan-button" onClick={()=>api('/billing/checkout',{method:'POST',body:JSON.stringify({plan_slug:p.slug})}).then(d=>alert(d.message)).catch(e=>alert(e.message))}>Choose plan</button></article>)}</div><button className="lock-readonly-button" onClick={onReadOnly}>View existing overview</button></div></div>}
 function BillingCenter({user,admin}){
+ const entitlementOptions=[
+  {key:'patient_management',label:'Patient management',description:'Patient records and care connections'},
+  {key:'diet_planning',label:'Diet planning',description:'Create and manage nutrition plans'},
+  {key:'client_communication',label:'Client messaging',description:'Conversations and messages'},
+  {key:'appointments',label:'Appointments',description:'Schedule and manage appointments'},
+  {key:'team_collaboration',label:'Team collaboration',description:'Team members and invitations'},
+  {key:'advanced_analytics',label:'Advanced analytics',description:'Advanced practice insights (ready for analytics module)'},
+  {key:'data_export',label:'Data export',description:'Export reports and records (ready for export module)'},
+  {key:'advanced_tools',label:'Advanced nutrition tools',description:'Advanced tools and workflows'},
+  {key:'client_feedback',label:'Client feedback & ratings',description:'Collect and review client feedback'}
+ ];
+ const defaultEntitlements=()=>Object.fromEntries(entitlementOptions.map(x=>[x.key,true]));
  const [plans,setPlans]=useState([]),[subs,setSubs]=useState([]),[status,setStatus]=useState(null),[stats,setStats]=useState({}),[busy,setBusy]=useState(false),[notice,setNotice]=useState(null),[editing,setEditing]=useState(null),[query,setQuery]=useState(''),[showInactive,setShowInactive]=useState(true);
  const [change,setChange]=useState({email:'',plan_slug:'basic',status:'comped',days:30,reason:''});
  const money=n=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(Number(n||0)/100);

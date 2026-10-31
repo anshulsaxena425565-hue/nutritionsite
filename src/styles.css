@@ -676,3 +676,69 @@ body{font-size:15px}
 
 /* Final specificity override: compact Superadmin diet plan grids */
 .admin-plan .admin-readable-plan .arp-targets{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:8px!important}.admin-plan .admin-readable-plan .arp-targets>article{display:flex!important;flex-direction:column!important;justify-content:center!important;gap:5px!important;min-width:0!important;min-height:64px!important;padding:10px 12px!important;border:1px solid #e1e5f5!important;border-radius:10px!important;background:linear-gradient(145deg,#fff,#f5f6ff)!important}.admin-plan .admin-readable-plan .arp-fields{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important;align-items:stretch!important}.admin-plan .admin-readable-plan .arp-meals{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}.admin-plan .admin-readable-plan .arp-fields>.arp-field{display:block!important;min-width:0!important;padding:9px 11px!important;border:1px solid #e2e6f4!important;border-radius:9px!important;background:#fff!important}.admin-plan .admin-readable-plan .arp-field p{margin:4px 0 0!important;font-size:12px!important;line-height:1.45!important;overflow-wrap:anywhere!important}.admin-plan .admin-readable-plan .arp-nested-section{display:grid!important;gap:7px!important;margin:2px 0 6px!important;min-width:0!important}.admin-plan .admin-readable-plan .arp-nested-section>.arp-fields{grid-template-columns:repeat(4,minmax(0,1fr))!important}.admin-plan .admin-readable-plan .arp-meals>.arp-record{min-width:0!important;padding:10px!important;border:1px solid #dfe4f5!important;border-radius:10px!important;background:#fff!important}.admin-plan .admin-readable-plan .arp-record-title{display:block!important;margin:0 0 7px!important;font-size:12px!important}.admin-plan .admin-readable-plan .arp-meals .arp-fields{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px!important}.admin-plan .admin-readable-plan .arp-meals .arp-nested-section{grid-column:1/-1!important}@media(max-width:1000px){.admin-plan .admin-readable-plan .arp-fields,.admin-plan .admin-readable-plan .arp-nested-section>.arp-fields{grid-template-columns:repeat(3,minmax(0,1fr))!important}.admin-plan .admin-readable-plan .arp-meals .arp-fields{grid-template-columns:repeat(2,minmax(0,1fr))!important}}@media(max-width:700px){.admin-plan .admin-readable-plan .arp-targets{grid-template-columns:repeat(2,minmax(0,1fr))!important}.admin-plan .admin-readable-plan .arp-fields,.admin-plan .admin-readable-plan .arp-nested-section>.arp-fields{grid-template-columns:repeat(2,minmax(0,1fr))!important}.admin-plan .admin-readable-plan .arp-meals{grid-template-columns:1fr!important}}@media(max-width:460px){.admin-plan .admin-readable-plan .arp-fields,.admin-plan .admin-readable-plan .arp-nested-section>.arp-fields,.admin-plan .admin-readable-plan .arp-meals .arp-fields{grid-template-columns:1fr!important}}
+
+
+/* Superadmin plan catalogue controls */
+.billing-catalogue-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.billing-catalogue-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0;flex-wrap:wrap}
+.billing-plan-search{display:flex;align-items:center;gap:9px;min-width:240px;max-width:420px;flex:1;padding:10px 12px;border:1px solid var(--line,#e5e7eb);border-radius:12px;background:var(--surface,#fff);color:var(--muted,#64748b)}
+.billing-plan-search input{border:0;outline:0;min-width:0;width:100%;background:transparent;color:inherit;font:inherit}
+.billing-include-archived,.billing-plan-checkbox{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted,#64748b);cursor:pointer}
+.billing-include-archived input,.billing-plan-checkbox input{accent-color:#315a45;width:16px;height:16px}
+.billing-editor-grid-robust{grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));align-items:start}
+.billing-plan-editor-robust{position:relative;overflow:hidden;padding:18px;border-radius:18px;border:1px solid var(--line,#e5e7eb);background:var(--surface,#fff);min-width:0}
+.billing-plan-editor-robust.is-unpublished{opacity:.88;background:var(--surface-muted,#fafafa)}
+.billing-plan-editor-robust.is-featured{border-color:#a6b7ed;box-shadow:0 0 0 1px #d9e1ff inset}
+.billing-plan-editor-robust .billing-editor-head{align-items:flex-start}
+.billing-plan-editor-robust .billing-editor-name h3{overflow-wrap:anywhere}
+.billing-plan-card-actions{display:flex;gap:6px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--line,#e5e7eb)}
+.billing-plan-card-actions button{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line,#e5e7eb);background:var(--surface,#fff);color:var(--text,#334155);border-radius:8px;padding:7px 9px;font:inherit;font-size:12px;cursor:pointer}
+.billing-plan-card-actions button:hover{border-color:#a8b6df;background:#f6f8ff}
+.billing-plan-card-actions button.danger{color:#b42318}
+.billing-plan-price-preview{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;padding:16px 0 12px}
+.billing-plan-price-preview b{font-size:28px;letter-spacing:-.04em;color:var(--text,#172033)}
+.billing-plan-price-preview span{font-size:12px;color:var(--muted,#64748b)}
+.billing-plan-price-preview small{flex-basis:100%;font-size:12px;color:var(--muted,#64748b)}
+.billing-plan-full-editor{display:grid;gap:14px;padding:14px;margin:4px 0 14px;background:var(--surface-muted,#f8fafc);border:1px solid var(--line,#e5e7eb);border-radius:13px}
+.billing-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.billing-pricing-period-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.billing-plan-checkbox{padding:10px 0;color:var(--text,#334155)}
+.billing-plan-editor-note{display:flex;align-items:flex-start;gap:8px;color:var(--muted,#64748b);font-size:12px;line-height:1.5}
+.billing-plan-editor-note svg{flex:none;margin-top:1px}
+.billing-empty-state{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:32px 12px;color:var(--muted,#64748b)}
+.billing-empty-state b{color:var(--text,#172033)}
+@media(max-width:760px){.billing-catalogue-toolbar{align-items:stretch}.billing-plan-search{max-width:none}.billing-form-grid{grid-template-columns:1fr}.billing-pricing-period-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.billing-catalogue-actions{width:100%}.billing-catalogue-actions .btn{flex:1;justify-content:center}}
+@media(max-width:420px){.billing-pricing-period-grid{grid-template-columns:1fr}.billing-plan-card-actions button{flex:1;justify-content:center}}
+
+
+/* Superadmin plan catalogue controls */
+.billing-catalogue-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.billing-catalogue-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0;flex-wrap:wrap}
+.billing-plan-search{display:flex;align-items:center;gap:9px;min-width:240px;max-width:420px;flex:1;padding:10px 12px;border:1px solid var(--line,#e5e7eb);border-radius:12px;background:var(--surface,#fff);color:var(--muted,#64748b)}
+.billing-plan-search input{border:0;outline:0;min-width:0;width:100%;background:transparent;color:inherit;font:inherit}
+.billing-include-archived,.billing-plan-checkbox{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted,#64748b);cursor:pointer}
+.billing-include-archived input,.billing-plan-checkbox input{accent-color:#315a45;width:16px;height:16px}
+.billing-editor-grid-robust{grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));align-items:start}
+.billing-plan-editor-robust{position:relative;overflow:hidden;padding:18px;border-radius:18px;border:1px solid var(--line,#e5e7eb);background:var(--surface,#fff);min-width:0}
+.billing-plan-editor-robust.is-unpublished{opacity:.88;background:var(--surface-muted,#fafafa)}
+.billing-plan-editor-robust.is-featured{border-color:#a6b7ed;box-shadow:0 0 0 1px #d9e1ff inset}
+.billing-plan-editor-robust .billing-editor-head{align-items:flex-start}
+.billing-plan-editor-robust .billing-editor-name h3{overflow-wrap:anywhere}
+.billing-plan-card-actions{display:flex;gap:6px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--line,#e5e7eb)}
+.billing-plan-card-actions button{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line,#e5e7eb);background:var(--surface,#fff);color:var(--text,#334155);border-radius:8px;padding:7px 9px;font:inherit;font-size:12px;cursor:pointer}
+.billing-plan-card-actions button:hover{border-color:#a8b6df;background:#f6f8ff}
+.billing-plan-card-actions button.danger{color:#b42318}
+.billing-plan-price-preview{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;padding:16px 0 12px}
+.billing-plan-price-preview b{font-size:28px;letter-spacing:-.04em;color:var(--text,#172033)}
+.billing-plan-price-preview span{font-size:12px;color:var(--muted,#64748b)}
+.billing-plan-price-preview small{flex-basis:100%;font-size:12px;color:var(--muted,#64748b)}
+.billing-plan-full-editor{display:grid;gap:14px;padding:14px;margin:4px 0 14px;background:var(--surface-muted,#f8fafc);border:1px solid var(--line,#e5e7eb);border-radius:13px}
+.billing-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.billing-pricing-period-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.billing-plan-checkbox{padding:10px 0;color:var(--text,#334155)}
+.billing-plan-editor-note{display:flex;align-items:flex-start;gap:8px;color:var(--muted,#64748b);font-size:12px;line-height:1.5}
+.billing-plan-editor-note svg{flex:none;margin-top:1px}
+.billing-empty-state{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:32px 12px;color:var(--muted,#64748b)}
+.billing-empty-state b{color:var(--text,#172033)}
+@media(max-width:760px){.billing-catalogue-toolbar{align-items:stretch}.billing-plan-search{max-width:none}.billing-form-grid{grid-template-columns:1fr}.billing-pricing-period-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.billing-catalogue-actions{width:100%}.billing-catalogue-actions .btn{flex:1;justify-content:center}}
+@media(max-width:420px){.billing-pricing-period-grid{grid-template-columns:1fr}.billing-plan-card-actions button{flex:1;justify-content:center}}

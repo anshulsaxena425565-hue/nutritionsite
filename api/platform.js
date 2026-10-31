@@ -6,6 +6,7 @@ const ROUTES = new Set([
   "dietitian/conversations", "dietitian/messages", "dietitian/appointments",
   "client/diet-plans", "dietitian/profile", "dietitian/requests",
   "admin/practices", "admin/dietitians", "admin/applicants", "admin/applicants/approve", "admin/users",
+  "billing/plans", "billing/status", "billing/checkout", "admin/billing/overview", "admin/billing/plans", "admin/billing/subscriptions",
   "practice/members", "practice/invitations", "practice/invitations/accept",
 
 ]);

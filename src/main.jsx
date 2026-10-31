@@ -142,28 +142,30 @@ function AdminDietPlanOversight(){
 
 
 function AdminReadablePlan({plan,notes}){
- const parsed=(()=>{if(plan&&typeof plan==="object")return plan;if(typeof plan==="string"){try{return JSON.parse(plan)}catch{return {plan_text:plan}}}return {}})();
- const human=k=>String(k||"").replace(/([a-z])([A-Z])/g,"$1 $2").replace(/[_-]+/g," ").replace(/\b\w/g,c=>c.toUpperCase());
- const empty=v=>v===null||v===undefined||v===""||(Array.isArray(v)&&!v.length);
-  const value=v=>{if(empty(v))return "Not specified";if(typeof v==="boolean")return v?"Yes":"No";if(Array.isArray(v))return v.map(item=>typeof item==="object"&&item!==null?Object.entries(item).map(([k,z])=>human(k)+": "+value(z)).join(" · "):String(item)).join("\n");if(typeof v==="object")return Object.entries(v).map(([k,z])=>human(k)+": "+value(z)).join("\n");return String(v)};
- const find=(obj,keys)=>{const k=Object.keys(obj||{}).find(x=>keys.includes(x.toLowerCase().replace(/[- ]/g,"_")));return k?obj[k]:undefined};
-  const meals=find(parsed,["meals","meal_plan","meal_schedule","daily_meals","schedule","mealplan"]);
- const mealRows=Array.isArray(meals)?meals:(meals&&typeof meals==="object"?Object.entries(meals).map(([name,v])=>typeof v==="object"?{name,...v}:{name,description:v}):[]);
-  const excluded=new Set(["meals","meal_plan","meal_schedule","daily_meals","schedule","mealplan","plan_text","raw"]);
-  const allFields=Object.entries(parsed).filter(([k,v])=>!excluded.has(k.toLowerCase())&&!empty(v));
-  const macroKeys=["energy_kcal","calories","kcal","energy","protein_g","protein","carbohydrate_g","carbs_g","carbohydrates","carbohydrate","fat_g","fat","fiber_g","fibre_g","fiber","fibre","water_l"];
-  const macro=allFields.filter(([k,v])=>macroKeys.includes(k.toLowerCase())&&(typeof v!=="object"||v===null));
-  const general=allFields.filter(([k])=>!macroKeys.includes(k.toLowerCase()));
-  const nested=[];
- const notesValue=(()=>{if(!notes)return null;if(typeof notes==="object")return notes;if(typeof notes==="string"){try{return JSON.parse(notes)}catch{return notes}}return String(notes)})();
+ const parse=v=>{if(v&&typeof v==="object")return v;if(typeof v==="string"){try{return JSON.parse(v)}catch{return v}}return v};
+ const parsed=parse(plan);
+ const human=k=>String(k||"").replace(/([a-z])([A-Z])/g,"$1 $2").replace(/[_-]+/g," ").replace(/\\b\\w/g,c=>c.toUpperCase());
+ const empty=v=>v===null||v===undefined||v==="";
+ const pretty=v=>{if(empty(v))return "Not specified";if(typeof v==="boolean")return v?"Yes":"No";if(typeof v==="object")return "";return String(v)};
+ const mealKeys=["meals","meal_plan","meal_schedule","daily_meals","schedule","mealplan","diet_chart","diet_chart_plan","food_chart","daily_diet_chart"];
+ const isMealKey=k=>mealKeys.includes(String(k).toLowerCase().replace(/[ -]/g,"_"));
+ const renderValue=(label,v,path="root",depth=0)=>{
+  v=parse(v);
+  if(empty(v))return <article key={path} className="arp-field"><small>{human(label)}</small><p>Not specified</p></article>;
+  if(typeof v!=="object")return <article key={path} className="arp-field"><small>{human(label)}</small><p>{pretty(v)}</p></article>;
+  if(Array.isArray(v)){
+   if(!v.length)return <article key={path} className="arp-field"><small>{human(label)}</small><p>No entries saved</p></article>;
+   return <section key={path} className="arp-nested-section"><h5>{human(label)} <span>{v.length} {v.length===1?"item":"items"}</span></h5><div className={isMealKey(label)?"arp-meals":"arp-fields"}>{v.map((item,i)=>{const title=item&&typeof item==="object"&&!Array.isArray(item)?(item.name||item.meal||item.meal_name||item.title||item.time||item.timing||human(label)+" "+(i+1)):human(label)+" "+(i+1);return <article className="arp-record" key={path+"-"+i}><b className="arp-record-title">{title}</b>{item&&typeof item==="object"&&!Array.isArray(item)?<div className="arp-fields">{Object.entries(item).filter(([k])=>!["name","meal","meal_name","title"].includes(k.toLowerCase())).map(([k,val])=>renderValue(k,val,path+"-"+i+"-"+k,depth+1))}</div>:<p>{pretty(item)}</p>}</article>})}</div></section>
+  }
+  const entries=Object.entries(v);
+  if(!entries.length)return <article key={path} className="arp-field"><small>{human(label)}</small><p>No details saved</p></article>;
+  return <section key={path} className="arp-nested-section"><h5>{human(label)}</h5><div className="arp-fields">{entries.map(([k,val])=>renderValue(k,val,path+"-"+k,depth+1))}</div></section>
+ };
+ const notesValue=parse(notes);
+ const planMissing=parsed===undefined||parsed===null||parsed==="";
  return <div className="admin-readable-plan">
-  {macro.length>0&&<section className="arp-section"><h4>Nutrition targets</h4><div className="arp-targets">{macro.map(([k,v])=><article key={k}><small>{human(k)}</small><b>{value(v)}{typeof v==="number"&&/energy|calories|kcal/i.test(k)?" kcal":typeof v==="number"&&/_g$/.test(k)?" g":""}</b></article>)}</div></section>}
-  {general.length>0&&<section className="arp-section"><h4>Plan information</h4><div className="arp-fields">{general.map(([k,v])=><article key={k}><small>{human(k)}</small><p>{value(v)}</p></article>)}</div></section>}
-  {nested.length>0&&<section className="arp-section"><h4>Additional details</h4><div className="arp-fields">{nested.map(([k,v])=><article key={k}><small>{human(k)}</small><p>{value(v)}</p></article>)}</div></section>}
-  {mealRows.length>0&&<section className="arp-section"><h4>Meal schedule <span>{mealRows.length} {mealRows.length===1?"meal":"meals"}</span></h4><div className="arp-meals">{mealRows.map((m,i)=>{const obj=m&&typeof m==="object"?m:{description:m};const title=obj.name||obj.meal||obj.meal_name||obj.title||"Meal "+(i+1);const time=obj.time||obj.timing||obj.meal_time;const food=obj.foods||obj.items||obj.options||obj.food_items||obj.description||obj.details||obj.portion;const rest=Object.entries(obj).filter(([k,v])=>!["name","meal","meal_name","title","time","timing","meal_time","foods","items","options","food_items","description","details","portion"].includes(k.toLowerCase())&&!empty(v));return <article key={i}><div className="arp-meal-head"><b>{title}</b>{time&&<span>{time}</span>}</div>{food!==undefined&&<p>{value(food)}</p>}{rest.length>0&&<div className="arp-fields">{rest.map(([k,v])=><div key={k}><small>{human(k)}</small><p>{value(v)}</p></div>)}</div>}</article>})}</div></section>}
-  {parsed.plan_text&&<section className="arp-section"><h4>Plan details</h4><p className="arp-text">{parsed.plan_text}</p></section>}
-  {notesValue!==null&&<section className="arp-section"><h4>Dietitian notes</h4>{typeof notesValue==="object"?<div className="arp-fields">{Object.entries(notesValue).map(([k,v])=><article key={k}><small>{human(k)}</small><p>{value(v)}</p></article>)}</div>:<p className="arp-text">{notesValue}</p>}</section>}
-  {!Object.keys(parsed).length&&notesValue===null&&<p className="arp-empty">No saved plan content is available for this version.</p>}
+  {planMissing?<p className="arp-empty">No saved plan content is available for this version.</p>:typeof parsed==="object"?<>{Object.entries(parsed).map(([k,v])=>renderValue(k,v,"plan-"+k))}</>:<section className="arp-section"><h4>Plan details</h4><p className="arp-text">{String(parsed)}</p></section>}
+  {!empty(notesValue)&&<section className="arp-section"><h4>Dietitian notes</h4>{typeof notesValue==="object"?<div className="arp-fields">{Object.entries(notesValue).map(([k,v])=>renderValue(k,v,"notes-"+k))}</div>:<p className="arp-text">{String(notesValue)}</p>}</section>}
  </div>
 }
 

@@ -50,6 +50,17 @@ async function getSession(request, env) {
 async function audit(env, actor, practiceId, action, resourceType, resourceId = null, metadata = {}) {
   await env.DB.prepare("INSERT INTO audit_logs(id,practice_id,actor_user_id,action,resource_type,resource_id,metadata_json) VALUES(?,?,?,?,?,?,?)").bind(id(), practiceId, actor, action, resourceType, resourceId, JSON.stringify(metadata)).run();
 }
+const PLAN_FEATURE_PATHS = {
+  "/dietitian/plans": "diet_planning",
+  "/dietitian/patients": "patient_management",
+  "/dietitian/requests": "patient_management",
+  "/dietitian/conversations": "client_communication",
+  "/dietitian/messages": "client_communication",
+  "/dietitian/appointments": "appointments",
+  "/practice/invitations": "team_collaboration",
+  "/practice/members": "team_collaboration"
+};
+const PLAN_FEATURE_KEYS = ["patient_management","diet_planning","client_communication","appointments","team_collaboration","advanced_analytics","data_export","advanced_tools","client_feedback"];
 export default {
  async fetch(request, env) {
   const headers = cors(request);
@@ -145,18 +156,30 @@ export default {
     return json({success:true,message:"Super Admin allowlisted. Sign in using email code."},201,headers);
    }
    const session=await getSession(request,env);
+   // Entitlement switches are enforced server-side for mapped dietitian API features.
+   // Keep the platform administrator exempt so they can always support and inspect accounts.
+   const requiredPlanFeature=PLAN_FEATURE_PATHS[path]||(path.startsWith("/dietitian/requests/")?"patient_management":path.startsWith("/dietitian/patients/")?"patient_management":path.startsWith("/practice/invitations/")?"team_collaboration":null);
+   if(session?.account_type==="dietitian"&&!session.is_platform_admin&&requiredPlanFeature){
+    const access=await env.DB.prepare("SELECT s.status,s.trial_ends_at,s.current_period_end,p.entitlements_json FROM dietitian_subscriptions s JOIN subscription_plans p ON p.id=s.plan_id WHERE s.user_id=?").bind(session.user_id).first();
+    if(access&&["trialing","active","comped"].includes(access.status)){
+     const end=access.status==="trialing"?access.trial_ends_at:access.current_period_end;
+     const stillValid=!end||Date.parse(end)>Date.now();
+     const entitlements=(()=>{try{return JSON.parse(access.entitlements_json||"{}")}catch{return {}}})();
+     if(stillValid&&entitlements[requiredPlanFeature]===false)return json({success:false,message:"This feature is not included in your current plan. Ask your administrator to enable it or upgrade your plan.",feature:requiredPlanFeature},403,headers);
+    }
+   }
    if(path==="/billing/plans"&&request.method==="GET") {
-    const rows=await env.DB.prepare("SELECT id,slug,name,description,price_minor,prices_minor_json,patient_limit,is_unlimited,trial_days,features_json,is_active,is_featured,sort_order FROM subscription_plans WHERE is_active=1 ORDER BY sort_order,name").all();
-    return json({success:true,plans:(rows.results||[]).map(p=>({...p,prices_minor:JSON.parse(p.prices_minor_json||"{}"),features:JSON.parse(p.features_json||"[]"),is_active:!!p.is_active,is_unlimited:!!p.is_unlimited,is_featured:!!p.is_featured}))},200,headers);
+    const rows=await env.DB.prepare("SELECT id,slug,name,description,price_minor,prices_minor_json,patient_limit,is_unlimited,trial_days,features_json,entitlements_json,is_active,is_featured,sort_order FROM subscription_plans WHERE is_active=1 ORDER BY sort_order,name").all();
+    return json({success:true,plans:(rows.results||[]).map(p=>({...p,prices_minor:JSON.parse(p.prices_minor_json||"{}"),features:JSON.parse(p.features_json||"[]"),entitlements:JSON.parse(p.entitlements_json||"{}"),is_active:!!p.is_active,is_unlimited:!!p.is_unlimited,is_featured:!!p.is_featured}))},200,headers);
    }
    if(path==="/billing/status"&&request.method==="GET") {
     if(!session)return json({success:false,message:"Sign in required."},401,headers);
     if(session.account_type!=="dietitian")return json({success:false,message:"Subscriptions are only available for dietitian accounts."},403,headers);
-    let sub=await env.DB.prepare("SELECT s.*,p.slug AS plan_slug,p.name AS plan_name,p.patient_limit,p.is_unlimited,p.price_minor FROM dietitian_subscriptions s JOIN subscription_plans p ON p.id=s.plan_id WHERE s.user_id=?").bind(session.user_id).first();
-    if(!sub){const basic=await env.DB.prepare("SELECT id,trial_days FROM subscription_plans WHERE slug='basic' AND is_active=1").first();if(basic){const start=now(),end=new Date(Date.now()+Number(basic.trial_days||14)*86400000).toISOString();await env.DB.prepare("INSERT OR IGNORE INTO dietitian_subscriptions(id,user_id,plan_id,status,trial_ends_at,current_period_start,current_period_end) VALUES(?,?,?,'trialing',?,?,?)").bind(id(),session.user_id,basic.id,end,start,end).run();sub=await env.DB.prepare("SELECT s.*,p.slug AS plan_slug,p.name AS plan_name,p.patient_limit,p.is_unlimited,p.price_minor FROM dietitian_subscriptions s JOIN subscription_plans p ON p.id=s.plan_id WHERE s.user_id=?").bind(session.user_id).first();}}
+    let sub=await env.DB.prepare("SELECT s.*,p.slug AS plan_slug,p.name AS plan_name,p.patient_limit,p.is_unlimited,p.price_minor,p.entitlements_json FROM dietitian_subscriptions s JOIN subscription_plans p ON p.id=s.plan_id WHERE s.user_id=?").bind(session.user_id).first();
+    if(!sub){const basic=await env.DB.prepare("SELECT id,trial_days FROM subscription_plans WHERE slug='basic' AND is_active=1").first();if(basic){const start=now(),end=new Date(Date.now()+Number(basic.trial_days||14)*86400000).toISOString();await env.DB.prepare("INSERT OR IGNORE INTO dietitian_subscriptions(id,user_id,plan_id,status,trial_ends_at,current_period_start,current_period_end) VALUES(?,?,?,'trialing',?,?,?)").bind(id(),session.user_id,basic.id,end,start,end).run();sub=await env.DB.prepare("SELECT s.*,p.slug AS plan_slug,p.name AS plan_name,p.patient_limit,p.is_unlimited,p.price_minor,p.entitlements_json FROM dietitian_subscriptions s JOIN subscription_plans p ON p.id=s.plan_id WHERE s.user_id=?").bind(session.user_id).first();}}
     if(sub&&["trialing","active","comped"].includes(sub.status)&&((sub.status==="trialing"&&sub.trial_ends_at&&Date.parse(sub.trial_ends_at)<=Date.now())||(sub.current_period_end&&Date.parse(sub.current_period_end)<=Date.now()))){await env.DB.prepare("UPDATE dietitian_subscriptions SET status='expired',updated_at=? WHERE id=?").bind(now(),sub.id).run();sub.status="expired";}
     const count=await env.DB.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM (SELECT client_user_id AS user_id FROM dietitian_requests WHERE dietitian_user_id=? AND status='accepted' UNION SELECT user_id FROM client_profiles WHERE assigned_dietitian_user_id=?)").bind(session.user_id,session.user_id).first();
-    return json({success:true,subscription:sub?{...sub,is_unlimited:!!sub.is_unlimited,locked:!["trialing","active","comped"].includes(sub.status)}:null,patient_count:Number(count?.n||0),locked:!sub||!["trialing","active","comped"].includes(sub.status)},200,headers);
+    return json({success:true,subscription:sub?{...sub,is_unlimited:!!sub.is_unlimited,entitlements:(()=>{try{return JSON.parse(sub.entitlements_json||"{}")}catch{return {}}})(),locked:!["trialing","active","comped"].includes(sub.status)}:null,patient_count:Number(count?.n||0),locked:!sub||!["trialing","active","comped"].includes(sub.status)},200,headers);
    }
    if(path==="/billing/checkout"&&request.method==="POST") {
     if(!session)return json({success:false,message:"Sign in required."},401,headers);
@@ -170,10 +193,10 @@ export default {
     if(!session?.is_platform_admin) return json({success:false,message:"Platform administrator access required."},session?403:401,headers);
  
    if(path==="/admin/billing/overview"&&request.method==="GET") {
-    const plans=await env.DB.prepare("SELECT id,slug,name,description,price_minor,prices_minor_json,patient_limit,is_unlimited,trial_days,features_json,is_active,is_featured,sort_order,created_at,updated_at FROM subscription_plans ORDER BY sort_order,name").all();
+    const plans=await env.DB.prepare("SELECT id,slug,name,description,price_minor,prices_minor_json,patient_limit,is_unlimited,trial_days,features_json,entitlements_json,is_active,is_featured,sort_order,created_at,updated_at FROM subscription_plans ORDER BY sort_order,name").all();
     const subscriptions=await env.DB.prepare("SELECT s.id,s.user_id,u.display_name,u.email,s.status,s.trial_ends_at,s.current_period_start,s.current_period_end,s.admin_override,s.override_reason,p.slug AS plan_slug,p.name AS plan_name FROM dietitian_subscriptions s JOIN app_users u ON u.id=s.user_id JOIN subscription_plans p ON p.id=s.plan_id ORDER BY s.updated_at DESC LIMIT 500").all();
     const stats=await env.DB.prepare("SELECT (SELECT COUNT(*) FROM app_users WHERE account_type='dietitian' AND status='active') AS dietitians,(SELECT COUNT(*) FROM dietitian_subscriptions WHERE status='trialing' AND (trial_ends_at IS NULL OR trial_ends_at>?)) AS trialing,(SELECT COUNT(*) FROM dietitian_subscriptions WHERE status IN ('active','comped')) AS active,(SELECT COUNT(*) FROM dietitian_subscriptions WHERE status IN ('expired','suspended','cancelled') OR (status='trialing' AND trial_ends_at<=?)) AS expired").bind(now(),now()).first();
-    return json({success:true,plans:(plans.results||[]).map(p=>({...p,prices_minor:JSON.parse(p.prices_minor_json||"{}"),features:JSON.parse(p.features_json||"[]"),is_active:!!p.is_active,is_unlimited:!!p.is_unlimited,is_featured:!!p.is_featured})),subscriptions:subscriptions.results||[],stats:stats||{}},200,headers);
+    return json({success:true,plans:(plans.results||[]).map(p=>({...p,prices_minor:JSON.parse(p.prices_minor_json||"{}"),features:JSON.parse(p.features_json||"[]"),entitlements:JSON.parse(p.entitlements_json||"{}"),is_active:!!p.is_active,is_unlimited:!!p.is_unlimited,is_featured:!!p.is_featured})),subscriptions:subscriptions.results||[],stats:stats||{}},200,headers);
    }
    if(path==="/admin/billing/plans"&&request.method==="POST") {
     const b=await body(request),action=clean(b.action||"save",20),reason=clean(b.reason||"Plan catalogue updated by Superadmin",500);
@@ -195,7 +218,8 @@ export default {
      const price=Math.max(0,Math.min(1000000000,Math.round(Number(p.price_minor??0))));if(!Number.isFinite(price))return json({success:false,message:"Enter a valid price for "+name+"."},400,headers);
      const pr=p.prices_minor&&typeof p.prices_minor==="object"?p.prices_minor:{monthly:price},prices={monthly:price,quarterly:Math.max(0,Math.min(3000000000,Math.round(Number(pr.quarterly||0)))),half_yearly:Math.max(0,Math.min(6000000000,Math.round(Number(pr.half_yearly||0)))),yearly:Math.max(0,Math.min(12000000000,Math.round(Number(pr.yearly||0))))};
      const limit=Math.max(1,Math.min(1000000,Math.round(Number(p.patient_limit||1)))),trial=Math.max(0,Math.min(365,Math.round(Number(p.trial_days??14)))),features=Array.isArray(p.features)?p.features.map(x=>clean(x,180)).filter(Boolean).slice(0,80):[];
-     await env.DB.prepare("INSERT INTO subscription_plans(id,slug,name,description,price_minor,prices_minor_json,patient_limit,is_unlimited,trial_days,features_json,is_active,is_featured,sort_order,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET slug=excluded.slug,name=excluded.name,description=excluded.description,price_minor=excluded.price_minor,prices_minor_json=excluded.prices_minor_json,patient_limit=excluded.patient_limit,is_unlimited=excluded.is_unlimited,trial_days=excluded.trial_days,features_json=excluded.features_json,is_active=excluded.is_active,is_featured=excluded.is_featured,sort_order=excluded.sort_order,updated_at=excluded.updated_at").bind(pid,slug,name,description,price,JSON.stringify(prices),limit,p.is_unlimited===true?1:0,trial,JSON.stringify(features),p.is_active===false?0:1,p.is_featured===true?1:0,Math.max(0,Math.min(9999,Math.round(Number(p.sort_order||i+1)))),now()).run();
+     const rawEntitlements=p.entitlements&&typeof p.entitlements==="object"?p.entitlements:{},entitlements=Object.fromEntries(PLAN_FEATURE_KEYS.map(key=>[key,rawEntitlements[key]!==false]));
+     await env.DB.prepare("INSERT INTO subscription_plans(id,slug,name,description,price_minor,prices_minor_json,patient_limit,is_unlimited,trial_days,features_json,entitlements_json,is_active,is_featured,sort_order,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET slug=excluded.slug,name=excluded.name,description=excluded.description,price_minor=excluded.price_minor,prices_minor_json=excluded.prices_minor_json,patient_limit=excluded.patient_limit,is_unlimited=excluded.is_unlimited,trial_days=excluded.trial_days,features_json=excluded.features_json,entitlements_json=excluded.entitlements_json,is_active=excluded.is_active,is_featured=excluded.is_featured,sort_order=excluded.sort_order,updated_at=excluded.updated_at").bind(pid,slug,name,description,price,JSON.stringify(prices),limit,p.is_unlimited===true?1:0,trial,JSON.stringify(features),JSON.stringify(entitlements),p.is_active===false?0:1,p.is_featured===true?1:0,Math.max(0,Math.min(9999,Math.round(Number(p.sort_order||i+1)))),now()).run();
     }
     await audit(env,session.user_id,null,"billing.plan_catalogue_saved","subscription_plan",null,{count:b.plans.length,reason});
     return json({success:true,message:"Plan catalogue saved. Published plans are available to new selections.",count:b.plans.length},200,headers);

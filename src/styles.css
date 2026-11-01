@@ -779,3 +779,21 @@ body{font-size:15px}
 .billing-plan-modal-backdrop .billing-form-grid,.billing-plan-modal-backdrop .billing-pricing-period-grid{gap:16px;}
 .billing-plan-modal-backdrop .billing-plan-editor-note{margin-top:18px;}
 @media(max-width:700px){.billing-plan-modal-backdrop{align-items:flex-start;padding:10px;}.billing-plan-modal-backdrop .billing-plan-full-editor{max-height:calc(100dvh - 20px);padding:17px;border-radius:17px;}.billing-plan-modal-head h3{font-size:19px;}}
+
+
+/* Shared invoice workspace */
+.invoice-primary-actions{align-items:center}
+.invoice-primary-actions .btn{min-height:42px}
+.patient-invoice-workspace .invoice-hero{margin-bottom:18px}
+.patient-invoice-workspace .invoice-history-card{align-items:center}
+.patient-invoice-workspace .invoice-history-info strong{display:block;margin-top:4px;color:#424b67}
+.patient-invoice-workspace .invoice-history-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.patient-invoice-workspace .invoice-history-actions .badge{white-space:nowrap}
+.patient-invoice-workspace .invoice-empty{padding:44px 18px}
+@media(max-width:760px){
+ .invoice-primary-actions{display:grid;grid-template-columns:1fr 1fr}
+ .invoice-primary-actions .btn{justify-content:center}
+ .patient-invoice-workspace .invoice-history-card{align-items:flex-start}
+ .patient-invoice-workspace .invoice-history-actions{grid-column:1/-1;width:100%}
+ .patient-invoice-workspace .invoice-history-actions .btn{flex:1}
+}

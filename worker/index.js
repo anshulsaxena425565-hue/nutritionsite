@@ -319,8 +319,17 @@ export default {
       const duplicate=await env.DB.prepare("SELECT id FROM practice_invoices WHERE practice_id=? AND invoice_number=?").bind(member.practice_id,number).first();
       if(duplicate)return json({success:false,message:"That invoice number is already in use in this practice. Choose a different number."},409,headers);
     }
-    const patientUser=to?await env.DB.prepare("SELECT id FROM app_users WHERE email=? COLLATE NOCASE").bind(to).first():null;
-    const payload={...invoice,id:invoiceId,number,patient_name:patient,patient_email:to,patient_address:clean(invoice.patient_address,500),date,due_date:due,currency,tax_percent:taxPercent,items,subtotal,tax,total,status:existing?.status||"Draft",sent_at:existing?.sent_at||null,created_at:existing?invoice.created_at||null:now(),brand:{brand_name:clean(invoice.brand?.brand_name,120),dietitian_name:clean(invoice.brand?.dietitian_name,120),email:clean(invoice.brand?.email,254),phone:clean(invoice.brand?.phone,40),address:clean(invoice.brand?.address,600),website:clean(invoice.brand?.website,200),logo:typeof invoice.brand?.logo==="string"&&invoice.brand.logo.length<=1200000?invoice.brand.logo:""}};
+    const selectedPatientId=clean(invoice.patient_user_id,80);
+    let patientUser=null;
+    if(selectedPatientId){
+      patientUser=await env.DB.prepare("SELECT u.id,u.email,u.display_name,cp.preferred_name FROM client_profiles cp JOIN app_users u ON u.id=cp.user_id WHERE cp.user_id=? AND cp.practice_id=? AND (cp.assigned_dietitian_user_id=? OR EXISTS(SELECT 1 FROM dietitian_requests r WHERE r.practice_id=cp.practice_id AND r.client_user_id=cp.user_id AND r.dietitian_user_id=? AND r.status='accepted')) AND u.status='active'").bind(selectedPatientId,member.practice_id,session.user_id,session.user_id).first();
+      if(!patientUser)return json({success:false,message:"Select a connected patient in your active practice, then try again."},403,headers);
+    }else if(to){
+      patientUser=await env.DB.prepare("SELECT id,email,display_name FROM app_users WHERE email=? COLLATE NOCASE").bind(to).first();
+    }
+    const finalEmail=patientUser?.email||to;
+    if(finalEmail&&!emailOk(finalEmail))return json({success:false,message:"The selected patient's account does not have a valid email address."},400,headers);
+    const payload={...invoice,id:invoiceId,patient_user_id:patientUser?.id||null,number,patient_name:patientUser?(clean(patientUser.preferred_name,120)||clean(patientUser.display_name,120)||patient):patient,patient_email:finalEmail,patient_address:clean(invoice.patient_address,500),date,due_date:due,currency,tax_percent:taxPercent,items,subtotal,tax,total,status:existing?.status||"Draft",sent_at:existing?.sent_at||null,created_at:existing?invoice.created_at||null:now(),brand:{brand_name:clean(invoice.brand?.brand_name,120),dietitian_name:clean(invoice.brand?.dietitian_name,120),email:clean(invoice.brand?.email,254),phone:clean(invoice.brand?.phone,40),address:clean(invoice.brand?.address,600),website:clean(invoice.brand?.website,200),logo:typeof invoice.brand?.logo==="string"&&invoice.brand.logo.length<=1200000?invoice.brand.logo:""}};
     const stamp=now(),jsonPayload=JSON.stringify(payload);
     if(existing){
       await env.DB.prepare("UPDATE practice_invoices SET patient_user_id=?,invoice_number=?,patient_name=?,patient_email=?,invoice_json=?,updated_at=? WHERE id=? AND practice_id=? AND dietitian_user_id=?").bind(patientUser?.id||null,number,patient,to,jsonPayload,stamp,invoiceId,member.practice_id,session.user_id).run();

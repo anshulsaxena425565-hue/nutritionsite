@@ -128,6 +128,20 @@ const MODULE_LABEL_KEYS={"Overview":"overview","Find a dietitian":"find_dietitia
 function ModuleControlCentre(){
  const [catalog,SC]=useState(null),[settings,SS]=useState({}),[type,ST]=useState("client"),[busy,SB]=useState(false),[loading,SL]=useState(true),[notice,SN]=useState(null),[query,SQ]=useState("");
  async function load(clearNotice=true){SL(true);if(clearNotice)SN(null);try{const d=await api("/admin/module-controls");SC(d.catalog||{});SS(d.settings||{})}catch(e){SN({text:e.message,error:true})}finally{SL(false)}}
+ const consultationRequestsEnabled=(settings.client?.consultation_requests?.enabled)!==false&&(settings.dietitian?.consultation_requests?.enabled)!==false;
+ async function setConsultationRequestsEnabled(enabled){
+  SB(true);SN(null);
+  try{
+   const roles=["client","dietitian"];
+   for(const role of roles){
+    const roleModules=catalog?.[role]||[];
+    await api("/admin/module-controls",{method:"POST",body:JSON.stringify({user_type:role,modules:roleModules.map(m=>({key:m.key,enabled:m.key==="consultation_requests"?enabled:(settings[role]?.[m.key]?.enabled)!==false}))})});
+   }
+   await load(false);
+   SN({text:enabled?"Consultation requests are enabled for clients and dietitians.":"Consultation requests are disabled for clients and dietitians. Related navigation is hidden; existing records are preserved."});
+  }catch(e){SN({text:"Could not update the global consultation-request setting: "+e.message,error:true})}
+  finally{SB(false)}
+ }
  useEffect(()=>{load()},[]);
  const modules=catalog?.[type]||[];
  const enabledCount=modules.filter(m=>(settings[type]?.[m.key]?.enabled)!==false).length;
@@ -138,6 +152,7 @@ function ModuleControlCentre(){
  const changed=modules.some(m=>(settings[type]?.[m.key]?.enabled)!==false && settings[type]?.[m.key]?.enabled===false) || modules.some(m=>settings[type]?.[m.key]?.enabled!==undefined && settings[type][m.key].enabled!==((settings[type][m.key].enabled)!==false));
  return <div className="module-control-centre">
   <section className="module-control-hero"><div><span className="module-control-eyebrow"><ShieldCheck size={14}/> PLATFORM CONFIGURATION</span><h2>One platform. Your rules.</h2><p>Choose which modules each dashboard role can access. Changes are saved centrally and enforced by the platform API.</p><div className="module-hero-pills"><span><CheckCircle2 size={14}/> Persistent settings</span><span><ShieldCheck size={14}/> Role-based access</span><span><Activity size={14}/> Live controls</span></div></div><div className="module-hero-visual"><div className="module-orbit module-orbit-a"/><div className="module-orbit module-orbit-b"/><div className="module-hero-lock"><SlidersHorizontal size={28}/><b>ACCESS</b><small>CONTROL</small></div></div></section>
+  <section className="module-settings-panel" style={{marginBottom:20}}><div className="module-settings-head"><div><span className="module-section-eyebrow">GLOBAL FEATURE SWITCH</span><h3>Consultation requests</h3><p>Turn the consultation-request workflow on or off across client and dietitian dashboards. Existing requests and historical data are not deleted.</p></div><button role="switch" aria-checked={consultationRequestsEnabled} aria-label={(consultationRequestsEnabled?"Disable":"Enable")+" consultation requests globally"} className={"module-switch "+(consultationRequestsEnabled?"on":"")} onClick={()=>{if(consultationRequestsEnabled&&!window.confirm("Turn off consultation requests for all clients and dietitians? The request workflow will be hidden, and existing records will be preserved."))return;setConsultationRequestsEnabled(!consultationRequestsEnabled)}} disabled={loading||busy||!catalog}><span/></button></div><div className="module-row-copy"><span className={"module-state "+(consultationRequestsEnabled?"on":"off")}>{loading?"Loading status…":consultationRequestsEnabled?"Enabled platform-wide":"Disabled platform-wide"}</span><p>When disabled, the Consultation Requests navigation item is removed for both roles. To hide related overview charts and KPIs as well, those dashboard sections must use the same feature flag.</p></div></section>
   <div className="module-summary-grid"><article><span><Layers3 size={18}/></span><small>Available modules</small><b>{modules.length}</b><em>For selected dashboard</em></article><article><span className="module-summary-on"><CheckCircle2 size={18}/></span><small>Enabled</small><b>{enabledCount}</b><em>Visible and accessible</em></article><article><span className="module-summary-off"><ShieldCheck size={18}/></span><small>Disabled</small><b>{modules.length-enabledCount}</b><em>Restricted for this role</em></article><article><span><Users size={18}/></span><small>Dashboard role</small><b>{type==="client"?"Client":type==="dietitian"?"Dietitian":"Applicant"}</b><em>Configure independently</em></article></div>
   <section className="module-settings-panel"><div className="module-settings-head"><div><span className="module-section-eyebrow">ACCESS MATRIX</span><h3>Dashboard module permissions</h3><p>Each role has its own settings. Superadmin controls remain available at all times.</p></div><button className="module-refresh" onClick={load} disabled={loading||busy}><RefreshCw size={15}/> Refresh</button></div>
    <div className="module-role-tabs">{[["client","Client / Patient"],["dietitian","Dietitian"],["dietitian_applicant","Dietitian applicant"]].map(([v,label])=><button key={v} className={type===v?"active":""} onClick={()=>{ST(v);SQ("")}}>{label}<span>{(catalog?.[v]||[]).length}</span></button>)}</div>

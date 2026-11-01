@@ -13,7 +13,7 @@ function cors(request) {
   if (ORIGIN_ALLOWLIST.has(origin)) h["Access-Control-Allow-Origin"] = origin;
   return h;
 }
-function cookie(name, value, maxAge) { return `${name}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`; }
+function cookie(name, value, maxAge) { return `${name}=${value}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=${maxAge}`; }
 async function body(request) { const len = Number(request.headers.get("Content-Length") || 0); if (len > 16000) throw new Error("too_large"); const text = await request.text(); if (text.length > 16000) throw new Error("too_large"); return JSON.parse(text || "{}"); }
 async function sendOtp(env, to, code) {
   if (!env.RESEND_API_KEY || !env.MAIL_FROM) throw new Error("email_not_configured");

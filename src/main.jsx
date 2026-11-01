@@ -241,10 +241,10 @@ function downloadInvoicePdf(inv){
 
 async function sendInvoiceEmail(inv){
  let recipient=String(inv?.patient_email||'').trim();
- if(!/^\\S+@\\S+\\.\\S+$/.test(recipient)){
+ if(!/^\S+@\S+\.\S+$/.test(recipient)){
   recipient=String(window.prompt('Enter the patient email address for invoice '+(inv?.number||'')+':',recipient)||'').trim();
   if(!recipient)return;
-  if(!/^\\S+@\\S+\\.\\S+$/.test(recipient)){msg('Enter a valid email address, then try again.',true);return}
+  if(!/^\S+@\S+\.\S+$/.test(recipient)){msg('Enter a valid email address, then try again.',true);return}
   inv={...inv,patient_email:recipient};
   const updated=savedInvoices.map(x=>x.id===inv.id?{...x,patient_email:recipient}:x);
   SI(updated);localStorage.setItem('pn-invoices:'+user.id,JSON.stringify(updated));

@@ -345,6 +345,8 @@ export default {
     if(!emailOk(to)||!number||!patient||!date||!items.length)return json({success:false,message:"Add a valid patient email, invoice number, invoice date and at least one valid line item."},400,headers);
     const subtotal=items.reduce((sum,x)=>sum+x.quantity*x.rate,0), taxPercent=Math.min(100,Math.max(0,Number(invoice.tax_percent)||0)), tax=subtotal*taxPercent/100, total=subtotal+tax;
     if(!Number.isFinite(total)||total<=0)return json({success:false,message:"Invoice total must be greater than zero."},400,headers);
+    const savedInvoice=await env.DB.prepare("SELECT id FROM practice_invoices WHERE id=? AND dietitian_user_id=? AND patient_email=? COLLATE NOCASE").bind(clean(invoice.id,80),session.user_id,to).first();
+    if(!savedInvoice)return json({success:false,message:"Save this invoice before emailing it, then try again."},404,headers);
     const esc=v=>String(v??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
     const symbol=currency==="INR"?"₹":currency+" ";
     const money=n=>symbol+Number(n||0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -358,8 +360,10 @@ export default {
       const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:"Bearer "+env.RESEND_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({from:env.MAIL_FROM,to:[to],reply_to:emailOk(clean(brand.email,254))?clean(brand.email,254):undefined,subject:"Invoice "+number+" from "+brandName,html,text:textBody})});
       if(!response.ok){const detail=await response.text();console.error("Invoice email delivery failed",response.status,detail.slice(0,300));return json({success:false,message:"The invoice could not be emailed. Check the recipient address and mail service configuration, then try again."},502,headers);}
       const result=await response.json();
+      const sentAt=now();
+      await env.DB.prepare("UPDATE practice_invoices SET status='Sent',sent_at=?,updated_at=? WHERE id=? AND dietitian_user_id=? AND patient_email=? COLLATE NOCASE").bind(sentAt,sentAt,clean(invoice.id,80),session.user_id,to).run();
       await audit(env,session.user_id,null,"invoice.email_sent","invoice",number,{recipient:to,total,currency});
-      return json({success:true,message:"Invoice email sent.",id:result.id||null,recipient:to},200,headers);
+      return json({success:true,message:"Invoice email sent.",id:result.id||null,recipient:to,sent_at:sentAt},200,headers);
     } catch(e){console.error("Invoice email error",String(e));return json({success:false,message:"Invoice email could not be sent right now. Please try again."},502,headers);}
    }
    if(path==="/practice/invitations"&&request.method==="POST") {

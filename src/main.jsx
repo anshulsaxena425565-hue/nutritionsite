@@ -242,7 +242,7 @@ function downloadInvoicePdf(inv){
 async function refreshInvoiceRecords(){
  if(!user?.id)return;
  try{
-  if(user.account_type==='dietitian'||user.registration_intent==='dietitian'){
+  if((user.memberships||[]).some(m=>m.role==='dietitian')||user.account_type==='dietitian'||user.registration_intent==='dietitian'){
    const member=(user.memberships||[]).find(m=>m.role==='dietitian'&&m.status==='active')||(user.memberships||[]).find(m=>m.role==='dietitian');
    if(!member?.practice_id)return;
    const d=await api('/dietitian/invoices?practice_id='+encodeURIComponent(member.practice_id));

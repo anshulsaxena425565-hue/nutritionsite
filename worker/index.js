@@ -292,6 +292,49 @@ export default {
       return json({success:true},200,headers);
     }
    }
+   if(path==="/dietitian/invoices"&&request.method==="GET") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    if(session.account_type!=="dietitian"||session.is_platform_admin)return json({success:false,message:"Dietitian access required."},403,headers);
+    const requestedPractice=clean(url.searchParams.get("practice_id"),80);
+    const member=session.memberships.find(m=>m.role==="dietitian"&&m.status==="active"&&(!requestedPractice||m.practice_id===requestedPractice));
+    if(!member)return json({success:false,message:"An active dietitian practice membership is required to view invoices."},403,headers);
+    const rows=await env.DB.prepare("SELECT id,invoice_json,status,sent_at,created_at,updated_at FROM practice_invoices WHERE practice_id=? AND dietitian_user_id=? ORDER BY updated_at DESC LIMIT 500").bind(member.practice_id,session.user_id).all();
+    const invoices=(rows.results||[]).map(row=>{try{return {...JSON.parse(row.invoice_json||"{}"),id:row.id,status:row.status,sent_at:row.sent_at||null,created_at:row.created_at,updated_at:row.updated_at}}catch{return null}}).filter(Boolean);
+    return json({success:true,practice_id:member.practice_id,invoices},200,headers);
+   }
+   if(path==="/dietitian/invoices"&&request.method==="POST") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    if(session.account_type!=="dietitian"||session.is_platform_admin)return json({success:false,message:"Only a dietitian account can manage invoices."},403,headers);
+    const b=await body(request),requestedPractice=clean(b.practice_id,80),invoice=b.invoice||{};
+    const member=session.memberships.find(m=>m.role==="dietitian"&&m.status==="active"&&(!requestedPractice||m.practice_id===requestedPractice));
+    if(!member)return json({success:false,message:"An active dietitian practice membership is required to save invoices."},403,headers);
+    const invoiceId=clean(invoice.id,80)||id(),number=clean(invoice.number,80),patient=clean(invoice.patient_name,120),to=clean(invoice.patient_email,254).toLowerCase(),date=clean(invoice.date,20),due=clean(invoice.due_date,20),currency=clean(invoice.currency,8)||"INR";
+    const items=Array.isArray(invoice.items)?invoice.items.slice(0,40).map(x=>({description:clean(x.description,180),quantity:Number(x.quantity),rate:Number(x.rate)})).filter(x=>x.description&&Number.isFinite(x.quantity)&&x.quantity>0&&Number.isFinite(x.rate)&&x.rate>=0):[];
+    if(!number||!patient||!date||!items.length)return json({success:false,message:"Add an invoice number, patient name, invoice date and at least one valid line item."},400,headers);
+    if(to&&!emailOk(to))return json({success:false,message:"Enter a valid patient email address or leave it blank."},400,headers);
+    const subtotal=items.reduce((sum,x)=>sum+x.quantity*x.rate,0),taxPercent=Math.min(100,Math.max(0,Number(invoice.tax_percent)||0)),tax=subtotal*taxPercent/100,total=subtotal+tax;
+    if(!Number.isFinite(total)||total<=0)return json({success:false,message:"Invoice total must be greater than zero."},400,headers);
+    const existing=await env.DB.prepare("SELECT id,status,sent_at FROM practice_invoices WHERE id=? AND practice_id=? AND dietitian_user_id=?").bind(invoiceId,member.practice_id,session.user_id).first();
+    if(!existing){
+      const duplicate=await env.DB.prepare("SELECT id FROM practice_invoices WHERE practice_id=? AND invoice_number=?").bind(member.practice_id,number).first();
+      if(duplicate)return json({success:false,message:"That invoice number is already in use in this practice. Choose a different number."},409,headers);
+    }
+    const patientUser=to?await env.DB.prepare("SELECT id FROM app_users WHERE email=? COLLATE NOCASE").bind(to).first():null;
+    const payload={...invoice,id:invoiceId,number,patient_name:patient,patient_email:to,patient_address:clean(invoice.patient_address,500),date,due_date:due,currency,tax_percent:taxPercent,items,subtotal,tax,total,status:existing?.status||"Draft",sent_at:existing?.sent_at||null,created_at:existing?invoice.created_at||null:now(),brand:{brand_name:clean(invoice.brand?.brand_name,120),dietitian_name:clean(invoice.brand?.dietitian_name,120),email:clean(invoice.brand?.email,254),phone:clean(invoice.brand?.phone,40),address:clean(invoice.brand?.address,600),website:clean(invoice.brand?.website,200),logo:typeof invoice.brand?.logo==="string"&&invoice.brand.logo.length<=1200000?invoice.brand.logo:""}};
+    const stamp=now(),jsonPayload=JSON.stringify(payload);
+    if(existing){
+      await env.DB.prepare("UPDATE practice_invoices SET patient_user_id=?,invoice_number=?,patient_name=?,patient_email=?,invoice_json=?,updated_at=? WHERE id=? AND practice_id=? AND dietitian_user_id=?").bind(patientUser?.id||null,number,patient,to,jsonPayload,stamp,invoiceId,member.practice_id,session.user_id).run();
+    }else{
+      await env.DB.prepare("INSERT INTO practice_invoices(id,practice_id,dietitian_user_id,patient_user_id,invoice_number,patient_name,patient_email,status,invoice_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'Draft',?,?,?)").bind(invoiceId,member.practice_id,session.user_id,patientUser?.id||null,number,patient,to,jsonPayload,stamp,stamp).run();
+    }
+    return json({success:true,invoice:{...payload,updated_at:stamp}},existing?200:201,headers);
+   }
+   if(path==="/client/invoices"&&request.method==="GET") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const rows=await env.DB.prepare("SELECT i.id,i.invoice_json,i.status,i.sent_at,i.created_at,i.updated_at FROM practice_invoices i WHERE (i.patient_user_id=? OR lower(i.patient_email)=(SELECT lower(email) FROM app_users WHERE id=?)) AND i.status IN ('Sent','Paid','Overdue','Cancelled') ORDER BY i.updated_at DESC LIMIT 200").bind(session.user_id,session.user_id).all();
+    const invoices=(rows.results||[]).map(row=>{try{return {...JSON.parse(row.invoice_json||"{}"),id:row.id,status:row.status,sent_at:row.sent_at||null,created_at:row.created_at,updated_at:row.updated_at}}catch{return null}}).filter(Boolean);
+    return json({success:true,invoices},200,headers);
+   }
    if(path==="/dietitian/invoices/send"&&request.method==="POST") {
     if(!session)return json({success:false,message:"Sign in to send invoices."},401,headers);
     if(session.account_type!=="dietitian"||session.is_platform_admin)return json({success:false,message:"Only a dietitian account can send patient invoices."},403,headers);

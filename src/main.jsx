@@ -11,7 +11,22 @@ function Ico({name}){const icons={Scale,Flame,Utensils,Sprout,Activity,Droplet,R
 async function api(path,options={}){const method=String(options.method||'GET').toUpperCase();const mutation=['POST','PUT','PATCH','DELETE'].includes(method);const allowedWhenExpired=path==='/auth/logout'||path==='/billing/checkout';if(mutation&&window.__PN_BILLING_LOCKED&&!allowedWhenExpired){window.dispatchEvent(new CustomEvent('pn:subscription-action-blocked',{detail:{path}}));throw Error('Your subscription has expired. Choose a plan to perform this action.')}const r=await fetch(API+path,{...options,credentials:'include',headers:{'Content-Type':'application/json',...(options.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok){if((r.status===402||r.status===403)&&/subscription|trial|plan|expired|billing/i.test(String(d.message||''))){window.dispatchEvent(new CustomEvent('pn:subscription-action-blocked',{detail:{path}}))}throw Error(d.message||'Request failed ('+r.status+')')}return d}
 const cx=(...x)=>x.filter(Boolean).join(' ');
 function Btn({children,kind='',...p}){return <button className={cx('btn',kind)} {...p}>{children}</button>}
-function Notice({data}){return data?<div className={cx('notice',data.error&&'error')}>{data.error?<CircleHelp size={16}/>:<Check size={16}/>}<span>{data.text}</span></div>:null}
+function Notice({data}){
+ const [visible,setVisible]=React.useState(Boolean(data));
+ React.useEffect(()=>{
+  if(!data){setVisible(false);return}
+  setVisible(true);
+  const timer=setTimeout(()=>setVisible(false),4800);
+  return ()=>clearTimeout(timer);
+ },[data]);
+ if(!data||!visible)return null;
+ return <div className={cx('app-toast',data.error?'is-error':'is-success')} role={data.error?'alert':'status'} aria-live={data.error?'assertive':'polite'}>
+  <span className="app-toast-icon">{data.error?<CircleHelp size={19}/>:<Check size={19}/>}</span>
+  <span className="app-toast-copy">{data.text}</span>
+  <button className="app-toast-close" type="button" aria-label="Dismiss notification" onClick={()=>setVisible(false)}>×</button>
+  <span className="app-toast-progress"/>
+ </div>
+}
 function Field({label,children}){return <label className="field"><span>{label}</span>{children}</label>}
 function Badge({children,type=''}){return <span className={cx('badge',type)}>{children}</span>}
 function Table({heads,rows,empty='Nothing here yet.'}){return <div className="table-wrap"><table><thead><tr>{heads.map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{rows.length?rows.map((r,i)=><tr key={r.id||i}>{r.cells.map((c,j)=><td key={j}>{c}</td>)}</tr>):<tr><td colSpan={heads.length} className="empty">{empty}</td></tr>}</tbody></table></div>}

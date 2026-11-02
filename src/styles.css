@@ -797,3 +797,21 @@ body{font-size:15px}
  .patient-invoice-workspace .invoice-history-actions{grid-column:1/-1;width:100%}
  .patient-invoice-workspace .invoice-history-actions .btn{flex:1}
 }
+
+
+/* Dedicated dietitian patient inbox */
+.diet-chat-head-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.diet-chat-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:16px 20px;border-bottom:1px solid #eceef5;background:#fff}
+.diet-chat-summary>div{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #eceef5;border-radius:12px;background:#fcfcff;color:#625bd0}
+.diet-chat-summary>div>span{display:grid;gap:2px}
+.diet-chat-summary b{font-size:15px;color:#30384f}
+.diet-chat-summary small{font-size:12px;color:#858ca0}
+.diet-chat-list{background:#fff}
+.diet-chat-list .field input{width:100%;min-width:0}
+.diet-chat-list>button{padding:13px 10px}
+.diet-chat-list>button.active{background:#f0efff;border-color:#dfddff}
+.diet-chat-list>button small{text-transform:capitalize}
+.dietitian-inbox .care-chat-layout{min-height:560px}
+.dietitian-inbox .care-chat-messages{min-height:340px}
+.dietitian-inbox .care-chat-empty{margin:auto}
+@media(max-width:760px){.diet-chat-head-actions{align-items:flex-start}.diet-chat-summary{grid-template-columns:1fr;gap:8px;padding:12px}.dietitian-inbox .care-chat-layout{grid-template-columns:1fr;min-height:0}.diet-chat-list{border-right:0;border-bottom:1px solid #eceef5;max-height:280px;overflow:auto}.dietitian-inbox .care-chat-thread{min-height:420px;padding:0 14px 14px}}

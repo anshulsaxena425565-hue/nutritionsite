@@ -189,9 +189,36 @@ export default {
     await audit(env,session.user_id,null,"billing.checkout_unavailable","subscription_plan",plan.id,{slug:plan.slug});
     return json({success:false,message:"Online payments are not enabled yet. No payment was taken and your subscription was not changed."},501,headers);
    }
+
+   if(path==="/dietitian/tool-controls"&&request.method==="GET"){
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const member=await env.DB.prepare("SELECT 1 AS ok FROM practice_memberships WHERE user_id=? AND role='dietitian' AND status='active' LIMIT 1").bind(session.user_id).first();
+    if(!member&&!session.is_platform_admin)return json({success:false,message:"Dietitian access required."},403,headers);
+    const rows=await env.DB.prepare("SELECT tool_key,enabled FROM platform_tool_controls").all();
+    return json({success:true,settings:Object.fromEntries((rows.results||[]).map(r=>[r.tool_key,!!r.enabled]))},200,headers);
+   }
    if(path.startsWith("/admin/")) {
     if(!session?.is_platform_admin) return json({success:false,message:"Platform administrator access required."},session?403:401,headers);
  
+
+   if(path==="/admin/tool-controls"&&request.method==="GET"){
+    const rows=await env.DB.prepare("SELECT tool_key,enabled,updated_at FROM platform_tool_controls ORDER BY tool_key").all();
+    return json({success:true,tools:[{"key":"bmi","label":"BMI Calculator","category":"Anthropometry"},{"key":"carbs","label":"Carb Counting","category":"Diabetes care"},{"key":"food","label":"Food Nutrition Explorer","category":"Food reference"},{"key":"fodmap","label":"FODMAP Food Guide","category":"Gut health"},{"key":"energy","label":"Energy Needs Estimator","category":"Assessment"},{"key":"water","label":"Fluid Needs Quick Check","category":"Hydration"},{"key":"waist","label":"Waist-to-Height Ratio","category":"Risk screening"},{"key":"macro","label":"Macro Split Calculator","category":"Meal planning"},{"key":"rda","label":"RDA & Nutrient Reference","category":"Indian requirements"},{"key":"recipe","label":"Indian Recipe Analyzer","category":"Recipe analysis"},{"key":"compare","label":"Compare Foods","category":"Food comparison"},{"key":"exchange","label":"Exchange & Macro Planner","category":"Diet planning"},{"key":"adequacy","label":"Dietary Adequacy Analyzer","category":"Intake review"},{"key":"dietanalysis","label":"Diet Plan Nutrient Analysis","category":"Diet plan review"},{"key":"growth","label":"Growth & Weight Assessment","category":"Growth"},{"key":"references","label":"Clinical Reference Library","category":"Evidence library"},{"key":"interactions","label":"Drug–Nutrient Interactions","category":"Medication safety"},{"key":"enteral","label":"Enteral Nutrition Calculator","category":"Clinical support"},{"key":"malnutrition","label":"Malnutrition Screening Assistant","category":"Screening"},{"key":"monitoring","label":"Clinical Monitoring Dashboard","category":"Follow-up"},{"key":"glycemic","label":"Glycemic Index & Load","category":"Glucose response"},{"key":"label","label":"Nutrition Label Decoder","category":"Food label"},{"key":"renal","label":"Sodium · Potassium · Phosphorus","category":"Renal nutrition"},{"key":"pediatric","label":"Paediatric Fluids & BMR","category":"Paediatrics"},{"key":"fatprofile","label":"Fatty Acid Profile","category":"Lipids"},{"key":"supplement","label":"Supplement Label Calculator","category":"Supplement review"},{"key":"recall","label":"24-Hour Recall Journal","category":"Dietary assessment"},{"key":"drug","label":"Drug–Nutrient Interactions","category":"Medication safety"}],settings:Object.fromEntries((rows.results||[]).map(r=>[r.tool_key,!!r.enabled]))},200,headers);
+   }
+   if(path==="/admin/tool-controls"&&request.method==="POST"){
+    const b=await body(request),items=Array.isArray(b.tools)?b.tools:[];
+    if(items.length>28)return json({success:false,message:"Too many tool settings."},400,headers);
+    const allowed=new Set(["bmi","carbs","food","fodmap","energy","water","waist","macro","rda","recipe","compare","exchange","adequacy","dietanalysis","growth","references","interactions","enteral","malnutrition","monitoring","glycemic","label","renal","pediatric","fatprofile","supplement","recall","drug"]);
+    for(const item of items){
+     const key=clean(item.key,60);
+     if(!allowed.has(key)||typeof item.enabled!=="boolean")return json({success:false,message:"Invalid tool setting."},400,headers);
+    }
+    for(const item of items){
+     await env.DB.prepare("INSERT INTO platform_tool_controls(tool_key,enabled,updated_at,updated_by) VALUES(?,?,?,?) ON CONFLICT(tool_key) DO UPDATE SET enabled=excluded.enabled,updated_at=excluded.updated_at,updated_by=excluded.updated_by").bind(item.key,item.enabled?1:0,now(),session.user_id).run();
+    }
+    await audit(env,session.user_id,null,"platform.tool_controls_updated","platform_tool_controls",null,{count:items.length});
+    return json({success:true,message:"Dietitian tool visibility settings saved.",count:items.length},200,headers);
+   }
    if(path==="/admin/billing/overview"&&request.method==="GET") {
     const plans=await env.DB.prepare("SELECT id,slug,name,description,price_minor,prices_minor_json,patient_limit,is_unlimited,trial_days,features_json,entitlements_json,is_active,is_featured,sort_order,created_at,updated_at FROM subscription_plans ORDER BY sort_order,name").all();
     const subscriptions=await env.DB.prepare("SELECT s.id,s.user_id,u.display_name,u.email,s.status,s.trial_ends_at,s.current_period_start,s.current_period_end,s.admin_override,s.override_reason,p.slug AS plan_slug,p.name AS plan_name FROM dietitian_subscriptions s JOIN app_users u ON u.id=s.user_id JOIN subscription_plans p ON p.id=s.plan_id ORDER BY s.updated_at DESC LIMIT 500").all();

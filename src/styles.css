@@ -815,3 +815,28 @@ body{font-size:15px}
 .dietitian-inbox .care-chat-messages{min-height:340px}
 .dietitian-inbox .care-chat-empty{margin:auto}
 @media(max-width:760px){.diet-chat-head-actions{align-items:flex-start}.diet-chat-summary{grid-template-columns:1fr;gap:8px;padding:12px}.dietitian-inbox .care-chat-layout{grid-template-columns:1fr;min-height:0}.diet-chat-list{border-right:0;border-bottom:1px solid #eceef5;max-height:280px;overflow:auto}.dietitian-inbox .care-chat-thread{min-height:420px;padding:0 14px 14px}}
+
+
+/* Keep the sidebar account controls visible; let only the navigation scroll. */
+.sidebar{
+  height:100vh;
+  height:100dvh;
+  box-sizing:border-box;
+  overflow:hidden;
+}
+.sidebar>nav{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+  scrollbar-color:#d8d8eb transparent;
+  padding-bottom:10px;
+}
+.sidebar>nav::-webkit-scrollbar{width:5px}
+.sidebar>nav::-webkit-scrollbar-thumb{background:#d8d8eb;border-radius:8px}
+.sidebar>.side-bottom{
+  flex:0 0 auto;
+  margin-top:auto;
+}

@@ -14,7 +14,7 @@ function cors(request) {
   return h;
 }
 function cookie(name, value, maxAge) { return `${name}=${value}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=${maxAge}`; }
-async function body(request) { const len = Number(request.headers.get("Content-Length") || 0); if (len > 16000) throw new Error("too_large"); const text = await request.text(); if (text.length > 16000) throw new Error("too_large"); return JSON.parse(text || "{}"); }
+async function body(request) { const len = Number(request.headers.get("Content-Length") || 0); if (len > 1600000) throw new Error("too_large"); const text = await request.text(); if (new TextEncoder().encode(text).byteLength > 1600000) throw new Error("too_large"); return JSON.parse(text || "{}"); }
 async function sendOtp(env, to, code) {
   if (!env.RESEND_API_KEY || !env.MAIL_FROM) throw new Error("email_not_configured");
   const r = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject: "Your secure sign-in code", text: `Your sign-in code is ${code}. It expires in 10 minutes. If you did not request this, you can ignore this email.`, html: `<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px"><h2>Sign in securely</h2><p>Your one-time code is:</p><p style="font-size:32px;font-weight:700;letter-spacing:8px">${code}</p><p>This code expires in 10 minutes. Never share it with anyone.</p></div>` }) });
@@ -433,6 +433,15 @@ export default {
     dietitians.sort((a,b)=>order==="fee_low"?a.fee_minor-b.fee_minor:order==="experience"?b.experience_years-a.experience_years:a.display_name.localeCompare(b.display_name));
     return json({success:true,dietitians},200,headers);
    }
+   if(path==="/dietitian/profile"&&request.method==="GET") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const practiceId=clean(url.searchParams.get("practice_id"),80);
+    const member=session.memberships.find(m=>m.practice_id===practiceId&&m.role==="dietitian"&&m.status==="active");
+    if(!member&&!session.is_platform_admin)return json({success:false,message:"Active dietitian membership required."},403,headers);
+    const row=await env.DB.prepare("SELECT p.name AS practice_name,u.display_name,u.email,u.phone,dp.credentials,dp.registration_number,dp.bio,dp.business_name,dp.profile_photo_data_url,dp.contact_email,dp.contact_phone,dp.address,dp.website,dd.specialties_json,dd.languages_json,dd.consultation_modes_json,dd.gender,dd.fee_minor,dd.experience_years,dd.accepting_clients FROM practices p JOIN app_users u ON u.id=? LEFT JOIN dietitian_profiles dp ON dp.practice_id=p.id AND dp.user_id=u.id LEFT JOIN dietitian_directory dd ON dd.practice_id=p.id AND dd.user_id=u.id WHERE p.id=?").bind(session.user_id,practiceId).first();
+    if(!row)return json({success:false,message:"Practice profile not found."},404,headers);
+    return json({success:true,profile:{practice_id:practiceId,business_name:row.business_name||row.practice_name||"",profile_photo_data_url:row.profile_photo_data_url||"",dietitian_name:row.display_name||"",email:row.contact_email||row.email||"",phone:row.contact_phone||row.phone||"",address:row.address||"",website:row.website||"",credentials:row.credentials||"",registration_number:row.registration_number||"",bio:row.bio||"",specialties:JSON.parse(row.specialties_json||"[]"),languages:JSON.parse(row.languages_json||"[]"),consultation_modes:JSON.parse(row.consultation_modes_json||'["Online"]'),gender:row.gender||"",fee_rupees:Number(row.fee_minor||0)/100,experience_years:Number(row.experience_years||0),accepting_clients:row.accepting_clients!==0}},200,headers);
+   }
    if(path==="/dietitian/profile"&&request.method==="POST") {
     if(!session)return json({success:false,message:"Sign in required."},401,headers);
     const b=await body(request),practiceId=clean(b.practice_id,80);
@@ -444,7 +453,7 @@ export default {
     const fee=Math.max(0,Math.min(10000000,Math.round(Number(b.fee_rupees||0)*100)));
     const exp=Math.max(0,Math.min(70,Math.round(Number(b.experience_years||0))));
     const gender=clean(b.gender,30),bio=clean(b.bio,1200),credentials=clean(b.credentials,180),reg=clean(b.registration_number,100);
-    await env.DB.prepare("INSERT INTO dietitian_profiles(id,practice_id,user_id,credentials,registration_number,bio) VALUES(?,?,?,?,?,?) ON CONFLICT(practice_id,user_id) DO UPDATE SET credentials=excluded.credentials,registration_number=excluded.registration_number,bio=excluded.bio").bind(id(),practiceId,session.user_id,credentials,reg,bio).run();
+    await env.DB.prepare("INSERT INTO dietitian_profiles(id,practice_id,user_id,credentials,registration_number,bio,business_name,profile_photo_data_url,contact_email,contact_phone,address,website) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(practice_id,user_id) DO UPDATE SET credentials=excluded.credentials,registration_number=excluded.registration_number,bio=excluded.bio,business_name=excluded.business_name,profile_photo_data_url=excluded.profile_photo_data_url,contact_email=excluded.contact_email,contact_phone=excluded.contact_phone,address=excluded.address,website=excluded.website").bind(id(),practiceId,session.user_id,credentials,reg,bio,clean(b.business_name,120),typeof b.profile_photo_data_url==="string"&&b.profile_photo_data_url.length<=600000?b.profile_photo_data_url:"",clean(b.email,254),clean(b.phone,40),clean(b.address,600),clean(b.website,200)).run();
     await env.DB.prepare("INSERT INTO dietitian_directory(user_id,practice_id,specialties_json,languages_json,consultation_modes_json,gender,fee_minor,experience_years,accepting_clients,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id,practice_id) DO UPDATE SET specialties_json=excluded.specialties_json,languages_json=excluded.languages_json,consultation_modes_json=excluded.consultation_modes_json,gender=excluded.gender,fee_minor=excluded.fee_minor,experience_years=excluded.experience_years,accepting_clients=excluded.accepting_clients,updated_at=excluded.updated_at").bind(session.user_id,practiceId,JSON.stringify(specialties),JSON.stringify(languages),JSON.stringify(modes),gender,fee,exp,b.accepting_clients===false?0:1,now()).run();
     await audit(env,session.user_id,practiceId,"dietitian.profile_updated","dietitian_profile",session.user_id);
     return json({success:true,message:"Profile saved. It will appear in the client directory after Super Admin verification."},200,headers);

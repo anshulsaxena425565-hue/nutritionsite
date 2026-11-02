@@ -578,6 +578,34 @@ export default {
     await env.DB.prepare("UPDATE conversations SET updated_at=? WHERE id=?").bind(now(),conversationId).run();
     return json({success:true,message_id:messageId},201,headers);
    }
+
+   // Practice-scoped clinical nutrition record for an actively connected patient.
+   if(path==="/dietitian/clinical-record"&&(request.method==="GET"||request.method==="POST")) {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    if(session.account_type!=="dietitian"||session.is_platform_admin)return json({success:false,message:"Dietitian access required."},403,headers);
+    const isWrite=request.method==="POST",b=isWrite?await body(request):null;
+    const practiceId=clean(isWrite?b.practice_id:url.searchParams.get("practice_id"),80);
+    const clientId=clean(isWrite?b.client_user_id:url.searchParams.get("client_user_id"),80);
+    if(!practiceId||!clientId)return json({success:false,message:"Practice and patient are required."},400,headers);
+    const member=session.memberships.find(m=>m.practice_id===practiceId&&m.role==="dietitian"&&m.status==="active");
+    if(!member)return json({success:false,message:"Active dietitian practice membership required."},403,headers);
+    const patient=await env.DB.prepare("SELECT cp.user_id,cp.practice_id,cp.preferred_name,cp.date_of_birth,u.display_name,u.email FROM client_profiles cp JOIN app_users u ON u.id=cp.user_id WHERE cp.practice_id=? AND cp.user_id=? AND (cp.assigned_dietitian_user_id=? OR EXISTS(SELECT 1 FROM dietitian_requests r WHERE r.practice_id=cp.practice_id AND r.client_user_id=cp.user_id AND r.dietitian_user_id=? AND r.status='accepted')) AND u.status='active'").bind(practiceId,clientId,session.user_id,session.user_id).first();
+    if(!patient)return json({success:false,message:"Connected patient not found in this practice."},404,headers);
+    if(!isWrite){
+     const assessment=await env.DB.prepare("SELECT profile_json,patient_notes,status,updated_at FROM clinical_records WHERE practice_id=? AND client_user_id=? AND dietitian_user_id=?").bind(practiceId,clientId,session.user_id).first();
+     let profile={};try{profile=JSON.parse(assessment?.profile_json||"{}")}catch{}
+     return json({success:true,patient,profile,assessment:assessment?{patient_notes:assessment.patient_notes||"",status:assessment.status||"draft",updated_at:assessment.updated_at}:null},200,headers);
+    }
+    const profile=b.profile&&typeof b.profile==="object"&&!Array.isArray(b.profile)?b.profile:{};
+    const notes=clean(b.patient_notes,4000),status=clean(b.status,20)==="reviewed"?"reviewed":"draft";
+    const dob=clean(b.date_of_birth,10),preferred=clean(b.preferred_name,120);
+    if(dob&&!/^\\d{4}-\\d{2}-\\d{2}$/.test(dob))return json({success:false,message:"Enter a valid date of birth."},400,headers);
+    const stamp=now();
+    await env.DB.prepare("INSERT INTO clinical_records(id,practice_id,client_user_id,dietitian_user_id,profile_json,patient_notes,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(practice_id,client_user_id,dietitian_user_id) DO UPDATE SET profile_json=excluded.profile_json,patient_notes=excluded.patient_notes,status=excluded.status,updated_at=excluded.updated_at").bind(id(),practiceId,clientId,session.user_id,JSON.stringify(profile),notes,status,stamp,stamp).run();
+    await env.DB.prepare("UPDATE client_profiles SET preferred_name=CASE WHEN ?='' THEN preferred_name ELSE ? END,date_of_birth=CASE WHEN ?='' THEN date_of_birth ELSE ? END WHERE practice_id=? AND user_id=?").bind(preferred,preferred,dob,dob,practiceId,clientId).run();
+    await audit(env,session.user_id,practiceId,"clinical_record."+status,"clinical_record",clientId);
+    return json({success:true,message:status==="reviewed"?"Clinical record saved and marked reviewed.":"Clinical record draft saved.",status,updated_at:stamp},200,headers);
+   }
    if(path==="/dietitian/appointments"&&request.method==="GET") {
     if(!session)return json({success:false,message:"Sign in required."},401,headers);
     const practiceId=clean(url.searchParams.get("practice_id"),80);

@@ -904,3 +904,21 @@ body{font-size:15px}
 @keyframes toast-progress{from{transform:scaleX(1)}to{transform:scaleX(0)}}
 @media(max-width:600px){.app-toast{top:12px;right:12px;width:calc(100vw - 24px);min-height:62px;padding:11px 12px;border-radius:14px}}
 @media(prefers-reduced-motion:reduce){.app-toast{animation:none}.app-toast-progress{animation:none;transform:scaleX(0)}}
+
+
+/* Compact, editorial Diet Plans workspace banner */
+.diet-studio-hero{position:relative;isolation:isolate;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(250px,.65fr);align-items:center;gap:24px;min-height:0;height:260px;margin:0 0 18px;padding:0 34px;overflow:hidden;border-radius:22px;background:linear-gradient(112deg,#171d59 0%,#343b9b 54%,#6550b8 100%);color:#fff;box-shadow:0 10px 26px rgba(34,38,100,.12)}
+.diet-studio-hero:before,.diet-studio-hero:after{content:"";position:absolute;z-index:-1;pointer-events:none;border:1px solid rgba(255,255,255,.11);border-radius:50%}
+.diet-studio-hero:before{width:390px;height:390px;right:2%;top:-285px}.diet-studio-hero:after{width:300px;height:300px;right:5%;top:-238px}
+.diet-hero-copy{padding:0;max-width:660px}.diet-kicker{color:#c9ccff;font-size:11px;letter-spacing:1.65px}
+.diet-hero-copy h2{margin:13px 0 9px;font-size:clamp(27px,3vw,38px);line-height:1.08;letter-spacing:-1.35px;font-weight:800}.diet-hero-copy h2 em{color:#f1d5f2}
+.diet-hero-copy>p{max-width:570px;margin:0;color:#e2e5ff;font-size:13.5px;line-height:1.65}.diet-hero-tags{gap:7px;margin-top:16px}.diet-hero-tags span{padding:7px 10px;border-color:#ffffff2c;background:#ffffff12;color:#f7f7ff;font-size:11.5px}
+.diet-hero-art{position:relative;display:flex;align-items:center;justify-content:center;min-height:0;height:100%;background:none}
+.diet-hero-preview{position:relative;width:min(270px,100%);padding:16px 18px 13px;border:1px solid rgba(255,255,255,.65);border-radius:17px;background:linear-gradient(145deg,rgba(255,255,255,.98),rgba(241,242,255,.95));color:#29316f;box-shadow:0 15px 36px rgba(9,14,60,.22);transform:rotate(2deg)}
+.diet-hero-preview-head{display:grid;grid-template-columns:32px 1fr;align-items:center;column-gap:9px;margin-bottom:14px}.diet-hero-preview-head>span{grid-row:span 2;display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:#eeedff;color:#5b55cb}
+.diet-hero-preview-head b{font-size:12px;letter-spacing:1px}.diet-hero-preview-head small{font-size:9px;letter-spacing:1px;color:#8589ad}
+.diet-hero-preview-line{width:66%;height:6px;margin:7px 0;border-radius:8px;background:#e4e6f5}.diet-hero-preview-line.wide{width:94%;background:#d7d9f1}
+.diet-hero-preview-meals{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:13px}.diet-hero-preview-meals span{display:flex;align-items:center;gap:5px;padding:7px 6px;border-radius:8px;background:#f0f1fa;color:#555d8b;font-size:9px;font-weight:700}.diet-hero-preview-meals i{width:6px;height:6px;border-radius:50%;background:#7b75d8}
+.diet-hero-preview-foot{display:flex;align-items:center;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid #e7e8f3;color:#70779e;font-size:9.5px}.diet-hero-orbit-mark{position:absolute;right:5%;top:18%;display:grid;place-items:center;width:34px;height:34px;border:1px solid #ffffff55;border-radius:50%;background:#ffffff20;color:#fff}
+@media(max-width:850px){.diet-studio-hero{grid-template-columns:minmax(0,1fr) 220px;height:auto;min-height:230px;padding:24px;gap:12px}.diet-hero-preview{width:220px;padding:13px}}
+@media(max-width:600px){.diet-studio-hero{grid-template-columns:1fr;height:auto;min-height:0;padding:24px 20px 20px;gap:12px;border-radius:17px}.diet-hero-copy h2{font-size:28px}.diet-hero-art{height:145px;min-height:145px;justify-content:flex-start;padding-left:8px}.diet-hero-preview{width:235px;transform:rotate(1deg)}.diet-hero-orbit-mark{right:12%;top:3%}.diet-hero-tags{gap:6px}.diet-hero-tags span{font-size:10.5px;padding:6px 8px}}

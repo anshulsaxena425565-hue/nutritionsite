@@ -201,6 +201,47 @@ export default {
     if(!session?.is_platform_admin) return json({success:false,message:"Platform administrator access required."},session?403:401,headers);
  
 
+   if(path==="/admin/module-controls"&&request.method==="GET"){
+    const moduleInfo={
+     overview:["Overview","Core dashboard landing page."],
+     find_dietitian:["Find a dietitian","Discover and select a dietitian."],
+     consultation_requests:["Consultation requests","Manage consultation requests."],
+     nutrition_care:["My Nutrition Care","Patient nutrition care and plans."],
+     feedback_ratings:["Feedback & Ratings","Patient feedback and ratings."],
+     chat:["Chats","Patient conversations and replies."],
+     notifications:["Notifications","Important account and care updates."],
+     profile_settings:["Profile & Settings","Personal account settings."],
+     help_support:["Help & Support","Support and assistance."],
+     my_practice:["My practice","Practice workspace and details."],
+     team_invitations:["Team & invitations","Manage practice team access."],
+     dietitian_dashboard:["Dietitian Dashboard","Practice performance and analytics."],
+     patient_management:["Patient Management","Manage patients and clinical records."],
+     diet_plans:["Diet Plans","Create and manage patient diet plans."],
+     plan_billing:["Plan & billing","Manage dietitian subscription."],
+     more_tools:["More Tools","Clinical and nutrition tools."],
+     dietitian_profile:["Dietitian profile","Professional profile and directory details."],
+     invoices:["Invoices","Create and manage patient invoices."]
+    };
+    const roleKeys={
+     client:["overview","find_dietitian","consultation_requests","nutrition_care","feedback_ratings","notifications","profile_settings","help_support","invoices"],
+     dietitian:["overview","chat","notifications","my_practice","team_invitations","dietitian_dashboard","patient_management","diet_plans","plan_billing","more_tools","dietitian_profile","invoices"],
+     dietitian_applicant:["overview","more_tools"]
+    };
+    const catalog=Object.fromEntries(Object.entries(roleKeys).map(([role,keys])=>[role,keys.map(key=>({key,label:moduleInfo[key][0],description:moduleInfo[key][1]}))]));
+    const rows=await env.DB.prepare("SELECT user_type,module_key,enabled FROM platform_module_controls").all();
+    const settings={};
+    for(const row of rows.results||[]){settings[row.user_type]??={};settings[row.user_type][row.module_key]={enabled:!!row.enabled};}
+    return json({success:true,catalog,settings},200,headers);
+   }
+   if(path==="/admin/module-controls"&&request.method==="POST"){
+    const b=await body(request),role=clean(b.user_type,32),items=Array.isArray(b.modules)?b.modules:[];
+    const allowed={client:["overview","find_dietitian","consultation_requests","nutrition_care","feedback_ratings","notifications","profile_settings","help_support","invoices"],dietitian:["overview","chat","notifications","my_practice","team_invitations","dietitian_dashboard","patient_management","diet_plans","plan_billing","more_tools","dietitian_profile","invoices"],dietitian_applicant:["overview","more_tools"]};
+    if(!allowed[role])return json({success:false,message:"Invalid dashboard role."},400,headers);
+    if(items.length>20||items.some(x=>!allowed[role].includes(x.key)||typeof x.enabled!=="boolean"))return json({success:false,message:"Invalid module settings."},400,headers);
+    const statements=items.map(x=>env.DB.prepare("INSERT INTO platform_module_controls(user_type,module_key,enabled,updated_at,updated_by) VALUES(?,?,?,CURRENT_TIMESTAMP,?) ON CONFLICT(user_type,module_key) DO UPDATE SET enabled=excluded.enabled,updated_at=CURRENT_TIMESTAMP,updated_by=excluded.updated_by").bind(role,x.key,x.enabled?1:0,session.user_id));
+    if(statements.length)await env.DB.batch(statements);
+    return json({success:true,message:"Dashboard module permissions saved.",count:items.length},200,headers);
+   }
    if(path==="/admin/tool-controls"&&request.method==="GET"){
     const rows=await env.DB.prepare("SELECT tool_key,enabled,updated_at FROM platform_tool_controls ORDER BY tool_key").all();
     return json({success:true,tools:[{"key":"bmi","label":"BMI Calculator","category":"Anthropometry"},{"key":"carbs","label":"Carb Counting","category":"Diabetes care"},{"key":"food","label":"Food Nutrition Explorer","category":"Food reference"},{"key":"fodmap","label":"FODMAP Food Guide","category":"Gut health"},{"key":"energy","label":"Energy Needs Estimator","category":"Assessment"},{"key":"water","label":"Fluid Needs Quick Check","category":"Hydration"},{"key":"waist","label":"Waist-to-Height Ratio","category":"Risk screening"},{"key":"macro","label":"Macro Split Calculator","category":"Meal planning"},{"key":"rda","label":"RDA & Nutrient Reference","category":"Indian requirements"},{"key":"recipe","label":"Indian Recipe Analyzer","category":"Recipe analysis"},{"key":"compare","label":"Compare Foods","category":"Food comparison"},{"key":"exchange","label":"Exchange & Macro Planner","category":"Diet planning"},{"key":"adequacy","label":"Dietary Adequacy Analyzer","category":"Intake review"},{"key":"dietanalysis","label":"Diet Plan Nutrient Analysis","category":"Diet plan review"},{"key":"growth","label":"Growth & Weight Assessment","category":"Growth"},{"key":"references","label":"Clinical Reference Library","category":"Evidence library"},{"key":"interactions","label":"Drug–Nutrient Interactions","category":"Medication safety"},{"key":"enteral","label":"Enteral Nutrition Calculator","category":"Clinical support"},{"key":"malnutrition","label":"Malnutrition Screening Assistant","category":"Screening"},{"key":"monitoring","label":"Clinical Monitoring Dashboard","category":"Follow-up"},{"key":"glycemic","label":"Glycemic Index & Load","category":"Glucose response"},{"key":"label","label":"Nutrition Label Decoder","category":"Food label"},{"key":"renal","label":"Sodium · Potassium · Phosphorus","category":"Renal nutrition"},{"key":"pediatric","label":"Paediatric Fluids & BMR","category":"Paediatrics"},{"key":"fatprofile","label":"Fatty Acid Profile","category":"Lipids"},{"key":"supplement","label":"Supplement Label Calculator","category":"Supplement review"},{"key":"recall","label":"24-Hour Recall Journal","category":"Dietary assessment"},{"key":"drug","label":"Drug–Nutrient Interactions","category":"Medication safety"}],settings:Object.fromEntries((rows.results||[]).map(r=>[r.tool_key,!!r.enabled]))},200,headers);

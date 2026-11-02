@@ -840,3 +840,41 @@ body{font-size:15px}
   flex:0 0 auto;
   margin-top:auto;
 }
+
+
+/* Refined assigned diet-plan library cards */
+.diet-library-assigned{min-width:0}
+.diet-library-assigned>.diet-library-subhead{padding:2px 0 14px}
+.diet-library-assigned .diet-template-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px;align-items:stretch}
+.diet-library-assigned .assigned-plan-card{
+  display:flex;flex-direction:column;min-height:100%;padding:20px;
+  border:1px solid #e5e8f4;border-radius:18px;
+  background:linear-gradient(155deg,#fff 0%,#fbfbff 100%);
+  box-shadow:0 5px 18px rgba(37,45,91,.045);
+  transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease
+}
+.diet-library-assigned .assigned-plan-card:hover{border-color:#cfd2f5;box-shadow:0 12px 28px rgba(37,45,91,.09);transform:translateY(-2px)}
+.assigned-plan-card .diet-template-icon{width:44px;height:44px;border-radius:14px;margin:0 0 14px;background:linear-gradient(135deg,#efedff,#f8e9f6);color:#5c54d7}
+.assigned-plan-card>.badge{float:none;align-self:flex-start;margin:0 0 8px;padding:6px 11px;font-size:12px;font-weight:750}
+.assigned-plan-card h3{clear:none;margin:0 0 8px;font-size:16px;line-height:1.4;min-height:0;color:#202858}
+.assigned-plan-card .assigned-plan-patient{margin:0;color:#58658e!important;font-size:14px;font-weight:600}
+.assigned-plan-card .diet-template-meta{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 12px;padding:13px 0;border-top:1px solid #e9ebf5;border-bottom:1px solid #e9ebf5}
+.assigned-plan-card .diet-template-meta span{padding:7px 10px;border:1px solid #eceefa;border-radius:9px;background:#f6f6fc;color:#59617c;font-size:13px;font-weight:600;white-space:nowrap}
+.assigned-plan-card .assigned-plan-date{margin:0 0 16px;color:#8189a0;font-size:12px}
+.assigned-plan-actions{display:flex!important;align-items:stretch;gap:10px;flex-wrap:nowrap;margin-top:auto;padding-top:2px}
+.assigned-plan-actions .btn{
+  display:inline-flex!important;flex:1 1 0!important;align-items:center!important;justify-content:center!important;
+  flex-direction:row!important;gap:8px!important;min-width:0!important;min-height:44px;padding:10px 12px!important;
+  border-radius:11px!important;font-size:13px!important;font-weight:700;line-height:1.2!important;
+  white-space:nowrap!important;overflow:hidden;text-overflow:ellipsis
+}
+.assigned-plan-actions .btn svg{display:block;flex:0 0 auto;width:16px;height:16px}
+.assigned-plan-actions .btn.secondary{background:#fff;border-color:#dfe3f2;color:#343d68}
+.assigned-plan-actions .btn:not(.secondary){background:#5149c8;border-color:#5149c8;color:#fff}
+.assigned-plan-actions .btn:hover{transform:translateY(-1px);box-shadow:0 5px 13px rgba(67,61,174,.14)}
+@media(max-width:600px){
+ .diet-library-assigned .diet-template-grid{grid-template-columns:minmax(0,1fr)}
+ .diet-library-assigned .assigned-plan-card{padding:17px}
+ .assigned-plan-actions{gap:8px}
+ .assigned-plan-actions .btn{font-size:12px!important;padding:9px 8px!important}
+}

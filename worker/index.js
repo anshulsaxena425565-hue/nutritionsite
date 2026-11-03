@@ -168,6 +168,16 @@ export default {
      if(stillValid&&entitlements[requiredPlanFeature]===false)return json({success:false,message:"This feature is not included in your current plan. Ask your administrator to enable it or upgrade your plan.",feature:requiredPlanFeature},403,headers);
     }
    }
+   // Authenticated dashboards read the role-specific global module switches here.
+   // The Superadmin editor uses /admin/module-controls; client/dietitian navigation uses this route.
+   if(path==="/module-controls"&&request.method==="GET"){
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const rows=await env.DB.prepare("SELECT user_type,module_key,enabled FROM platform_module_controls").all();
+    const allSettings={};
+    for(const row of rows.results||[]){allSettings[row.user_type]??={};allSettings[row.user_type][row.module_key]={enabled:!!row.enabled};}
+    const userType=session.account_type==="dietitian"?(session.memberships||[]).some(m=>m.role==="dietitian"&&m.status==="active")?"dietitian":"dietitian_applicant":"client";
+    return json({success:true,user_type:userType,settings:allSettings},200,headers);
+   }
    if(path==="/billing/plans"&&request.method==="GET") {
     const rows=await env.DB.prepare("SELECT id,slug,name,description,price_minor,prices_minor_json,patient_limit,is_unlimited,trial_days,features_json,entitlements_json,is_active,is_featured,sort_order FROM subscription_plans WHERE is_active=1 ORDER BY sort_order,name").all();
     return json({success:true,plans:(rows.results||[]).map(p=>({...p,prices_minor:JSON.parse(p.prices_minor_json||"{}"),features:JSON.parse(p.features_json||"[]"),entitlements:JSON.parse(p.entitlements_json||"{}"),is_active:!!p.is_active,is_unlimited:!!p.is_unlimited,is_featured:!!p.is_featured}))},200,headers);

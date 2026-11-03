@@ -704,7 +704,7 @@ export default {
      return json({success:true,measurements:rows.results||[]},200,headers);
     }
     const date=clean(b.date,10),weight=Number(b.weight),height=Number(b.height);
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+"T12:00:00Z"))||!(weight>0&&weight<500&&height>=50&&height<260))return json({success:false,message:"Enter a valid measurement date, weight and height."},400,headers);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+"T12:00:00Z"))||!(weight>0&&weight<500&&height>=50&&height<260))return json({success:false,message:"Enter a valid measurement date, weight and height."},400,headers);
     const measurementId=id(),bmi=Number((weight/((height/100)**2)).toFixed(1)),stamp=now();
     await env.DB.prepare("INSERT INTO patient_measurements(id,client_user_id,practice_id,measurement_date,weight_kg,height_cm,bmi,recorded_by_user_id,recorded_by_role,note,created_at) VALUES(?,?,?,?,?,?,?,?, 'dietitian',?,?)").bind(measurementId,clientId,practiceId,date,weight,height,bmi,session.user_id,clean(b.note,500),stamp).run();
     await audit(env,session.user_id,practiceId,"patient_measurement.created","patient_measurement",measurementId,{client_user_id:clientId,measurement_date:date,source:"dietitian"});

@@ -599,13 +599,13 @@ export default {
      return json({success:true,measurements:rows.results||[]},200,headers);
     }
     const b=await body(request),date=clean(b.date,10),weight=Number(b.weight),height=Number(b.height);
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+"T12:00:00Z"))||!(weight>0&&weight<500&&height>=50&&height<260))return json({success:false,message:"Enter a valid measurement date, weight and height."},400,headers);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+"T12:00:00Z"))||!(weight>0&&weight<500&&height>=50&&height<260))return json({success:false,message:"Enter a valid measurement date, weight and height."},400,headers);
     const measurementId=clean(b.id,80)||id(),bmi=Number((weight/((height/100)**2)).toFixed(1)),stamp=now();
     await env.DB.prepare("INSERT INTO patient_measurements(id,client_user_id,measurement_date,weight_kg,height_cm,bmi,recorded_by_user_id,recorded_by_role,note,created_at) VALUES(?,?,?,?,?,?,?,'client',?,?) ON CONFLICT(id) DO NOTHING").bind(measurementId,session.user_id,date,weight,height,bmi,session.user_id,clean(b.note,500),stamp).run();
     await audit(env,session.user_id,null,"patient_measurement.created","patient_measurement",measurementId,{measurement_date:date,source:"client"});
     return json({success:true,message:"Measurement saved securely.",measurement:{id:measurementId,date,weight,height,bmi,recorded_by_role:"client",created_at:stamp}},201,headers);
    }
-   const clientMeasurementDelete=path.match(/^\\/client\\/measurements\\/([a-zA-Z0-9_-]+)$/);
+   const clientMeasurementDelete=path.match(/^\/client\/measurements\/([a-zA-Z0-9_-]+)$/);
    if(clientMeasurementDelete&&request.method==="DELETE"){
     if(!session)return json({success:false,message:"Sign in required."},401,headers);
     if(session.account_type!=="client")return json({success:false,message:"Client account required."},403,headers);

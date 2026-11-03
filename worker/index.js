@@ -626,14 +626,14 @@ export default {
     }
     const b=await body(request),date=clean(b.date,10),slot=clean(b.meal_slot,40),time=clean(b.meal_time,5),food=clean(b.food_description,1200),quantity=clean(b.quantity,160),note=clean(b.note,500);
     const slots=['Early morning','Breakfast','Mid-morning','Lunch','Evening snack','Dinner','Bedtime','Other'];
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+"T12:00:00Z"))||!slots.includes(slot)||!food)return json({success:false,message:"Enter a valid date, meal and food description."},400,headers);
-    if(time&&!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(time))return json({success:false,message:"Enter a valid meal time."},400,headers);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+"T12:00:00Z"))||!slots.includes(slot)||!food)return json({success:false,message:"Enter a valid date, meal and food description."},400,headers);
+    if(time&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))return json({success:false,message:"Enter a valid meal time."},400,headers);
     const entryId=id(),stamp=now();
     await env.DB.prepare("INSERT INTO patient_food_diary(id,client_user_id,diary_date,meal_slot,meal_time,food_description,quantity,note,recorded_by_user_id,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(entryId,session.user_id,date,slot,time,food,quantity,note,session.user_id,stamp).run();
     await audit(env,session.user_id,null,"patient_food_diary.created","patient_food_diary",entryId,{date,meal_slot:slot});
     return json({success:true,message:"Food diary entry saved and shared with your dietitian.",entry:{id:entryId,date,meal_slot:slot,meal_time:time,food_description:food,quantity,note,created_at:stamp}},201,headers);
    }
-   const foodDiaryDelete=path.match(/^\\/client\\/food-diary\\/([a-f0-9-]+)$/);
+   const foodDiaryDelete=path.match(/^\/client\/food-diary\/([a-f0-9-]+)$/);
    if(foodDiaryDelete&&request.method==="DELETE"){
     if(!session)return json({success:false,message:"Sign in required."},401,headers);
     if(session.account_type!=="client")return json({success:false,message:"Client account required."},403,headers);

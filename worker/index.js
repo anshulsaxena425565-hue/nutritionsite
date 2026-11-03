@@ -615,6 +615,33 @@ export default {
     await audit(env,session.user_id,null,"patient_measurement.deleted","patient_measurement",existing.id);
     return json({success:true,message:"Measurement deleted."},200,headers);
    }
+   // Patient-entered daily food diary, shared with the connected dietitian.
+   if(path==="/client/food-diary"&&(request.method==="GET"||request.method==="POST")) {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    if(session.account_type!=="client")return json({success:false,message:"Client account required."},403,headers);
+    if(request.method==="GET"){
+     const date=clean(url.searchParams.get("date"),10);
+     const rows=await env.DB.prepare("SELECT id,diary_date AS date,meal_slot,meal_time,food_description,quantity,note,created_at FROM patient_food_diary WHERE client_user_id=? AND (?='' OR diary_date=?) ORDER BY diary_date DESC,CASE meal_slot WHEN 'Early morning' THEN 1 WHEN 'Breakfast' THEN 2 WHEN 'Mid-morning' THEN 3 WHEN 'Lunch' THEN 4 WHEN 'Evening snack' THEN 5 WHEN 'Dinner' THEN 6 WHEN 'Bedtime' THEN 7 ELSE 8 END,meal_time,created_at LIMIT 1000").bind(session.user_id,date,date).all();
+     return json({success:true,entries:rows.results||[]},200,headers);
+    }
+    const b=await body(request),date=clean(b.date,10),slot=clean(b.meal_slot,40),time=clean(b.meal_time,5),food=clean(b.food_description,1200),quantity=clean(b.quantity,160),note=clean(b.note,500);
+    const slots=['Early morning','Breakfast','Mid-morning','Lunch','Evening snack','Dinner','Bedtime','Other'];
+    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+"T12:00:00Z"))||!slots.includes(slot)||!food)return json({success:false,message:"Enter a valid date, meal and food description."},400,headers);
+    if(time&&!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(time))return json({success:false,message:"Enter a valid meal time."},400,headers);
+    const entryId=id(),stamp=now();
+    await env.DB.prepare("INSERT INTO patient_food_diary(id,client_user_id,diary_date,meal_slot,meal_time,food_description,quantity,note,recorded_by_user_id,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(entryId,session.user_id,date,slot,time,food,quantity,note,session.user_id,stamp).run();
+    await audit(env,session.user_id,null,"patient_food_diary.created","patient_food_diary",entryId,{date,meal_slot:slot});
+    return json({success:true,message:"Food diary entry saved and shared with your dietitian.",entry:{id:entryId,date,meal_slot:slot,meal_time:time,food_description:food,quantity,note,created_at:stamp}},201,headers);
+   }
+   const foodDiaryDelete=path.match(/^\\/client\\/food-diary\\/([a-f0-9-]+)$/);
+   if(foodDiaryDelete&&request.method==="DELETE"){
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    if(session.account_type!=="client")return json({success:false,message:"Client account required."},403,headers);
+    const existing=await env.DB.prepare("SELECT id FROM patient_food_diary WHERE id=? AND client_user_id=?").bind(foodDiaryDelete[1],session.user_id).first();
+    if(!existing)return json({success:false,message:"Food diary entry not found."},404,headers);
+    await env.DB.prepare("DELETE FROM patient_food_diary WHERE id=? AND client_user_id=?").bind(existing.id,session.user_id).run();
+    return json({success:true,message:"Food diary entry deleted."},200,headers);
+   }
    if(path==="/client/diet-plans"&&request.method==="GET") {
     if(!session)return json({success:false,message:"Sign in required."},401,headers);
     const practiceId=clean(url.searchParams.get("practice_id"),80);
@@ -709,6 +736,18 @@ export default {
     await env.DB.prepare("INSERT INTO patient_measurements(id,client_user_id,practice_id,measurement_date,weight_kg,height_cm,bmi,recorded_by_user_id,recorded_by_role,note,created_at) VALUES(?,?,?,?,?,?,?,?, 'dietitian',?,?)").bind(measurementId,clientId,practiceId,date,weight,height,bmi,session.user_id,clean(b.note,500),stamp).run();
     await audit(env,session.user_id,practiceId,"patient_measurement.created","patient_measurement",measurementId,{client_user_id:clientId,measurement_date:date,source:"dietitian"});
     return json({success:true,message:"Patient measurement saved to the shared record.",measurement:{id:measurementId,date,weight,height,bmi,recorded_by_role:"dietitian",recorded_by_name:session.display_name,created_at:stamp}},201,headers);
+   }
+   if(path==="/dietitian/patient-food-diary"&&request.method==="GET"){
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    if(session.account_type!=="dietitian"||session.is_platform_admin)return json({success:false,message:"Dietitian access required."},403,headers);
+    const practiceId=clean(url.searchParams.get("practice_id"),80),clientId=clean(url.searchParams.get("client_user_id"),80),date=clean(url.searchParams.get("date"),10);
+    if(!practiceId||!clientId)return json({success:false,message:"Practice and patient are required."},400,headers);
+    const member=session.memberships.find(m=>m.practice_id===practiceId&&m.role==="dietitian"&&m.status==="active");
+    if(!member)return json({success:false,message:"Active dietitian practice membership required."},403,headers);
+    const connected=await env.DB.prepare("SELECT 1 AS ok FROM dietitian_requests WHERE practice_id=? AND client_user_id=? AND dietitian_user_id=? AND status='accepted' UNION SELECT 1 AS ok FROM client_profiles WHERE practice_id=? AND user_id=? AND assigned_dietitian_user_id=? LIMIT 1").bind(practiceId,clientId,session.user_id,practiceId,clientId,session.user_id).first();
+    if(!connected)return json({success:false,message:"Connected patient not found in this practice."},404,headers);
+    const rows=await env.DB.prepare("SELECT f.id,f.diary_date AS date,f.meal_slot,f.meal_time,f.food_description,f.quantity,f.note,f.created_at,u.display_name AS recorded_by_name FROM patient_food_diary f LEFT JOIN app_users u ON u.id=f.recorded_by_user_id WHERE f.client_user_id=? AND (?='' OR f.diary_date=?) ORDER BY f.diary_date DESC,CASE f.meal_slot WHEN 'Early morning' THEN 1 WHEN 'Breakfast' THEN 2 WHEN 'Mid-morning' THEN 3 WHEN 'Lunch' THEN 4 WHEN 'Evening snack' THEN 5 WHEN 'Dinner' THEN 6 WHEN 'Bedtime' THEN 7 ELSE 8 END,f.meal_time,f.created_at LIMIT 1000").bind(clientId,date,date).all();
+    return json({success:true,entries:rows.results||[]},200,headers);
    }
    // Practice-scoped clinical nutrition record for an actively connected patient.
    if(path==="/dietitian/clinical-record"&&(request.method==="GET"||request.method==="POST")) {

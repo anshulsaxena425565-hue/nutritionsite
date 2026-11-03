@@ -591,12 +591,65 @@ export default {
    }
 
    // Dietitian patient-management workspace
+   if(path==="/dietitian/patients/invite"&&request.method==="POST") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    if(session.account_type!=="dietitian"||session.is_platform_admin)return json({success:false,message:"Dietitian access required."},403,headers);
+    if(!env.RESEND_API_KEY||!env.MAIL_FROM)return json({success:false,message:"Patient invitation email is not configured. No account was created."},503,headers);
+    const b=await body(request),practiceId=clean(b.practice_id,80),name=clean(b.full_name,120),email=clean(b.email,254).toLowerCase(),phone=clean(b.mobile,24).replace(/[\s()+.-]/g,"");
+    const member=session.memberships.find(x=>x.practice_id===practiceId&&x.role==="dietitian"&&x.status==="active");
+    if(!member)return json({success:false,message:"Active dietitian practice membership required."},403,headers);
+    if(name.length<2||!emailOk(email)||!/^[0-9]{7,15}$/.test(phone))return json({success:false,message:"Enter a valid patient name, email and mobile number."},400,headers);
+    const duplicate=await env.DB.prepare("SELECT id FROM app_users WHERE email=? COLLATE NOCASE OR phone=? LIMIT 1").bind(email,phone).first();
+    if(duplicate)return json({success:false,message:"An account already exists for this email or mobile. No duplicate was created."},409,headers);
+    const dob=clean(b.date_of_birth,10);
+    if(dob&&!/^\d{4}-\d{2}-\d{2}$/.test(dob))return json({success:false,message:"Enter a valid date of birth."},400,headers);
+    const token=randomToken(32),inviteId=id(),userId=id(),expires=new Date(Date.now()+7*24*60*60*1000).toISOString();
+    const profile=b.profile&&typeof b.profile==="object"&&!Array.isArray(b.profile)?b.profile:{};
+    const safeProfile={};
+    for(const [k,v] of Object.entries(profile))if(typeof v==="string"||typeof v==="number"||typeof v==="boolean"||v===null)safeProfile[clean(k,80)]=typeof v==="string"?clean(v,1200):v;
+    safeProfile.intake_source="dietitian_added";
+    await env.DB.prepare("INSERT INTO app_users(id,email,display_name,phone,status,account_type) VALUES(?,?,?,?,'invited','client')").bind(userId,email,name,phone).run();
+    await env.DB.prepare("INSERT INTO practice_memberships(id,practice_id,user_id,role,status) VALUES(?,?,?,'client','invited')").bind(id(),practiceId,userId).run();
+    await env.DB.prepare("INSERT INTO client_profiles(id,practice_id,user_id,assigned_dietitian_user_id,date_of_birth,preferred_name,onboarding_status) VALUES(?,?,?,?,?,?, 'incomplete')").bind(id(),practiceId,userId,session.user_id,dob||null,clean(b.preferred_name,120)||name).run();
+    await env.DB.prepare("INSERT INTO clinical_records(id,practice_id,client_user_id,dietitian_user_id,profile_json,patient_notes,status) VALUES(?,?,?,?,?,?,'draft')").bind(id(),practiceId,userId,session.user_id,JSON.stringify(safeProfile),clean(b.patient_notes,4000)).run();
+    await env.DB.prepare("INSERT INTO practice_invitations(id,practice_id,email,role,invited_by_user_id,token_hash,expires_at) VALUES(?,?,?,'client',?,?,?)").bind(inviteId,practiceId,email,session.user_id,await hash(token),expires).run();
+    const acceptUrl="https://prachisayani.online/portal.html#invite="+encodeURIComponent(token);
+    try {
+     const r=await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:"Bearer "+env.RESEND_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({from:env.MAIL_FROM,to:[email],subject:"Activate your patient account",text:"Hello "+name+", "+session.display_name+" has invited you to "+member.practice_name+". Set your own password using this one-time link (expires in 7 days): "+acceptUrl,html:"<p>Hello "+name.replace(/[&<>"]/g,"")+". Your dietitian has invited you to their nutrition care workspace.</p><p><a href='"+acceptUrl+"'>Activate your patient account</a></p><p>This secure one-time link expires in 7 days.</p>"})});
+     if(!r.ok)throw new Error("email_send_failed");
+    } catch(e) {
+     await env.DB.prepare("DELETE FROM clinical_records WHERE practice_id=? AND client_user_id=? AND dietitian_user_id=?").bind(practiceId,userId,session.user_id).run();
+     await env.DB.prepare("DELETE FROM client_profiles WHERE practice_id=? AND user_id=?").bind(practiceId,userId).run();
+     await env.DB.prepare("DELETE FROM practice_memberships WHERE practice_id=? AND user_id=?").bind(practiceId,userId).run();
+     await env.DB.prepare("DELETE FROM practice_invitations WHERE id=?").bind(inviteId).run();
+     await env.DB.prepare("DELETE FROM app_users WHERE id=?").bind(userId).run();
+     return json({success:false,message:"Invitation email could not be delivered. No patient account was created; please try again."},502,headers);
+    }
+    await audit(env,session.user_id,practiceId,"patient.invited","patient",userId,{email});
+    return json({success:true,message:"Secure patient invitation sent. Their account activates after they create their password.",patient_id:userId},201,headers);
+   }
+   if(path==="/dietitian/patients/activate"&&request.method==="POST") {
+    const b=await body(request),token=clean(b.token,128),password=b.password;
+    if(token.length<32||!validPassword(password)||password!==b.confirm_password)return json({success:false,message:"Enter matching passwords of at least 10 characters with letters and numbers."},400,headers);
+    const invite=await env.DB.prepare("SELECT * FROM practice_invitations WHERE token_hash=? AND role='client' AND status='pending' AND expires_at>?").bind(await hash(token),now()).first();
+    if(!invite)return json({success:false,message:"Invitation is invalid, expired or already used. Ask your dietitian to send a new one."},400,headers);
+    const user=await env.DB.prepare("SELECT id,email,status FROM app_users WHERE email=? COLLATE NOCASE").bind(invite.email).first();
+    if(!user||user.status!=="invited")return json({success:false,message:"Patient invitation is no longer available."},409,headers);
+    const stamp=now(),stored=await passwordHash(password);
+    await env.DB.prepare("UPDATE app_users SET password_hash=?,status='active',updated_at=? WHERE id=? AND status='invited'").bind(stored,stamp,user.id).run();
+    await env.DB.prepare("UPDATE practice_memberships SET status='active' WHERE practice_id=? AND user_id=? AND role='client' AND status='invited'").bind(invite.practice_id,user.id).run();
+    await env.DB.prepare("UPDATE practice_invitations SET status='accepted',accepted_at=? WHERE id=? AND status='pending'").bind(stamp,invite.id).run();
+    await env.DB.prepare("UPDATE client_profiles SET onboarding_status='submitted' WHERE practice_id=? AND user_id=?").bind(invite.practice_id,user.id).run();
+    const sessionHeaders=await establishSession(env,user.id,headers);
+    await audit(env,user.id,invite.practice_id,"patient.account_activated","patient",user.id);
+    return json({success:true,message:"Patient account activated.",user:{id:user.id,email:user.email,account_type:"client"}},200,sessionHeaders);
+   }
    if(path==="/dietitian/patients"&&request.method==="GET") {
     if(!session)return json({success:false,message:"Sign in required."},401,headers);
     const practiceId=clean(url.searchParams.get("practice_id"),80);
     const member=session.memberships.find(m=>m.practice_id===practiceId&&m.role==="dietitian"&&m.status==="active");
     if(!member&&!session.is_platform_admin)return json({success:false,message:"Active dietitian membership required."},403,headers);
-    const rows=await env.DB.prepare("SELECT cp.user_id AS client_user_id,cp.preferred_name,cp.date_of_birth,cp.onboarding_status,u.display_name,u.email,cp.practice_id,p.name AS practice_name,cp.created_at,(SELECT COUNT(*) FROM diet_plans dp WHERE dp.practice_id=cp.practice_id AND dp.client_user_id=cp.user_id AND dp.dietitian_user_id=? AND dp.status!='archived') AS plan_count,(SELECT MAX(a.starts_at) FROM appointments a WHERE a.practice_id=cp.practice_id AND a.client_user_id=cp.user_id AND a.dietitian_user_id=?) AS next_appointment FROM client_profiles cp JOIN app_users u ON u.id=cp.user_id JOIN practices p ON p.id=cp.practice_id WHERE cp.practice_id=? AND (cp.assigned_dietitian_user_id=? OR EXISTS(SELECT 1 FROM dietitian_requests r WHERE r.practice_id=cp.practice_id AND r.client_user_id=cp.user_id AND r.dietitian_user_id=? AND r.status='accepted')) AND u.status='active' ORDER BY u.display_name LIMIT 300").bind(session.user_id,session.user_id,practiceId,session.user_id,session.user_id).all();
+    const rows=await env.DB.prepare("SELECT cp.user_id AS client_user_id,cp.preferred_name,cp.date_of_birth,cp.onboarding_status,u.display_name,u.email,cp.practice_id,p.name AS practice_name,cp.created_at,(SELECT COUNT(*) FROM diet_plans dp WHERE dp.practice_id=cp.practice_id AND dp.client_user_id=cp.user_id AND dp.dietitian_user_id=? AND dp.status!='archived') AS plan_count,(SELECT MAX(a.starts_at) FROM appointments a WHERE a.practice_id=cp.practice_id AND a.client_user_id=cp.user_id AND a.dietitian_user_id=?) AS next_appointment FROM client_profiles cp JOIN app_users u ON u.id=cp.user_id JOIN practices p ON p.id=cp.practice_id WHERE cp.practice_id=? AND (cp.assigned_dietitian_user_id=? OR EXISTS(SELECT 1 FROM dietitian_requests r WHERE r.practice_id=cp.practice_id AND r.client_user_id=cp.user_id AND r.dietitian_user_id=? AND r.status='accepted')) AND u.status IN ('active','invited') ORDER BY u.display_name LIMIT 300").bind(session.user_id,session.user_id,practiceId,session.user_id,session.user_id).all();
     return json({success:true,patients:rows.results||[]},200,headers);
    }
    // Shared account-level measurements: the client tracker and connected care team

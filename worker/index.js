@@ -9,7 +9,7 @@ const emailOk = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e.length <= 254;
 const now = () => new Date().toISOString();
 function cors(request) {
   const origin = request.headers.get("Origin") || "";
-  const h = { "Vary": "Origin", "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Credentials": "true" };
+  const h = { "Vary": "Origin", "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Credentials": "true" };
   if (ORIGIN_ALLOWLIST.has(origin)) h["Access-Control-Allow-Origin"] = origin;
   return h;
 }

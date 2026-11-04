@@ -1,4 +1,4 @@
-const ORIGIN_ALLOWLIST = new Set(["https://prachisayani.online", "https://www.prachisayani.online"]);
+const ORIGIN_ALLOWLIST = new Set(["https://prachisayani.online", "https://www.prachisayani.online", "https://anshulsaxena425565-hue.github.io"]);
 const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...headers } });
 const id = () => crypto.randomUUID();
 const hex = (b) => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
@@ -9,7 +9,7 @@ const emailOk = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e.length <= 254;
 const now = () => new Date().toISOString();
 function cors(request) {
   const origin = request.headers.get("Origin") || "";
-  const h = { "Vary": "Origin", "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Credentials": "true" };
+  const h = { "Vary": "Origin", "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, Authorization", "Access-Control-Allow-Credentials": "false" };
   if (ORIGIN_ALLOWLIST.has(origin)) h["Access-Control-Allow-Origin"] = origin;
   return h;
 }
@@ -36,10 +36,11 @@ function createSessionCookie(raw){return cookie("pn_session",raw,7*24*60*60);}
 async function establishSession(env,userId,headers){
   const raw=randomToken(32), expires=new Date(Date.now()+7*24*60*60*1000).toISOString();
   await env.DB.prepare("INSERT INTO auth_sessions(id,user_id,token_hash,expires_at,last_seen_at) VALUES(?,?,?,?,?)").bind(id(),userId,await hash(raw),expires,now()).run();
-  return {...headers,"Set-Cookie":createSessionCookie(raw)};
+  return {headers,token:raw};
 }
 async function getSession(request, env) {
-  const raw = (request.headers.get("Cookie") || "").split(";").map(s => s.trim()).find(s => s.startsWith("pn_session="))?.slice("pn_session=".length);
+  const bearer = request.headers.get("Authorization") || "";
+  const raw = bearer.startsWith("Bearer ") ? bearer.slice(7).trim() : (request.headers.get("Cookie") || "").split(";").map(s => s.trim()).find(s => s.startsWith("pn_session="))?.slice("pn_session=".length);
   if (!raw) return null;
   const row = await env.DB.prepare("SELECT s.id AS session_id,s.user_id,s.expires_at,u.email,u.display_name,u.status,u.account_type FROM auth_sessions s JOIN app_users u ON u.id=s.user_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>? AND u.status='active'").bind(await hash(raw), now()).first();
   if (!row) return null;
@@ -87,17 +88,17 @@ export default {
     if(existing)return json({success:false,message:"An account already exists for that email or mobile. Sign in instead, or use account recovery."},409,headers);
     const userId=id(),stored=await passwordHash(password);
     await env.DB.prepare("INSERT INTO app_users(id,email,display_name,phone,password_hash,status,account_type) VALUES(?,?,?,?,?,'active',?)").bind(userId,email,name,phone,stored,accountType).run();
-    const sessionHeaders=await establishSession(env,userId,headers);
+    const established=await establishSession(env,userId,headers);
     await audit(env,userId,null,"auth.register","user",userId);
-    return json({success:true,message:"Account created.",user:{id:userId,email,display_name:name,account_type:accountType}},201,sessionHeaders);
+    return json({success:true,message:"Account created.",session_token:established.token,user:{id:userId,email,display_name:name,account_type:accountType}},201,established.headers);
    }
    if (path === "/auth/login" && request.method === "POST") {
     const b=await body(request),identifier=clean(b.identifier,254).toLowerCase(),password=b.password;
     if(!identifier||typeof password!=="string"||password.length>128)return json({success:false,message:"Enter your email/mobile and password."},400,headers);
     const user=await env.DB.prepare("SELECT id,email,display_name,status,password_hash,account_type FROM app_users WHERE (email=? COLLATE NOCASE OR phone=?) LIMIT 1").bind(identifier,identifier.replace(/[\\s()+.-]/g,"")).first();
     if(!user||user.status!=="active"||!(await passwordMatches(password,user.password_hash)))return json({success:false,message:"Email/mobile or password is incorrect."},401,headers);
-    const sessionHeaders=await establishSession(env,user.id,headers);
-    return json({success:true,message:"Signed in.",user:{id:user.id,email:user.email,display_name:user.display_name,account_type:user.account_type||"client"}},200,sessionHeaders);
+    const established=await establishSession(env,user.id,headers);
+    return json({success:true,message:"Signed in.",session_token:established.token,user:{id:user.id,email:user.email,display_name:user.display_name,account_type:user.account_type||"client"}},200,established.headers);
    }
    if (path === "/auth/request-code" && request.method === "POST") {
     const b=await body(request), email=clean(b.email,254).toLowerCase();
@@ -129,10 +130,11 @@ export default {
     await env.DB.prepare("UPDATE auth_challenges SET consumed_at=? WHERE id=? AND consumed_at IS NULL").bind(now(),challenge.id).run();
     const raw=randomToken(32), expires=new Date(Date.now()+7*24*60*60*1000).toISOString();
     await env.DB.prepare("INSERT INTO auth_sessions(id,user_id,token_hash,expires_at,last_seen_at) VALUES(?,?,?,?,?)").bind(id(),user.id,await hash(raw),expires,now()).run();
-    return json({success:true,message:"Signed in."},200,{...headers,"Set-Cookie":cookie("pn_session",raw,7*24*60*60)});
+    return json({success:true,message:"Signed in.",session_token:raw},200,headers);
    }
    if (path === "/auth/logout" && request.method === "POST") {
-    const raw=(request.headers.get("Cookie")||"").split(";").map(s=>s.trim()).find(s=>s.startsWith("pn_session="))?.slice(11);
+    const bearer=request.headers.get("Authorization")||"";
+    const raw=bearer.startsWith("Bearer ")?bearer.slice(7).trim():(request.headers.get("Cookie")||"").split(";").map(s=>s.trim()).find(s=>s.startsWith("pn_session="))?.slice(11);
     if(raw) await env.DB.prepare("UPDATE auth_sessions SET revoked_at=? WHERE token_hash=? AND revoked_at IS NULL").bind(now(),await hash(raw)).run();
     return json({success:true},200,{...headers,"Set-Cookie":cookie("pn_session","",0)});
    }

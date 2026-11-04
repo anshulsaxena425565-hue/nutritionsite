@@ -5,7 +5,7 @@ import{Activity,ArrowLeft,ArrowRight,BookOpen,Bookmark,Building2,CalendarClock,C
 import'./styles.css';
 import'./expired-plan-actions.css';
 import'./plan-modal-fix.css';
-const API='https://prachi-nutrition-api.prachisayani-api.workers.dev';
+const API='/api/worker';
 function Ico({name}){const icons={Scale,Flame,Utensils,Sprout,Activity,Droplet,Ruler,ChartNoAxesCombined,BookOpen,CookingPot,ArrowLeftRight,ClipboardList,ChartNoAxesColumnIncreasing,ChartPie,TrendingUp,BookOpenCheck,Pill,GlassWater,HeartPulse,CalendarClock,Gauge,ScanSearch,Waves,Baby,Droplets,FlaskConical,NotebookPen,ChartSpline,TestTube};const C=icons[name];return C?<C aria-hidden="true"/>:null}
 
 async function api(path,options={}){const method=String(options.method||'GET').toUpperCase();const mutation=['POST','PUT','PATCH','DELETE'].includes(method);const allowedWhenExpired=path==='/auth/logout'||path==='/billing/checkout';if(mutation&&window.__PN_BILLING_LOCKED&&!allowedWhenExpired){window.dispatchEvent(new CustomEvent('pn:subscription-action-blocked',{detail:{path}}));throw Error('Your subscription has expired. Choose a plan to perform this action.')}const r=await fetch(API+path,{...options,credentials:'include',headers:{'Content-Type':'application/json',...(options.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok){if((r.status===402||r.status===403)&&/subscription|trial|plan|expired|billing/i.test(String(d.message||''))){window.dispatchEvent(new CustomEvent('pn:subscription-action-blocked',{detail:{path}}))}throw Error(d.message||'Request failed ('+r.status+')')}return d}

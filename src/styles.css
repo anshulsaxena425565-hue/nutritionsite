@@ -1037,3 +1037,13 @@ body{font-size:15px}
 .password-visibility{position:absolute;right:7px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:9px;background:transparent;color:#747b98;cursor:pointer;z-index:2}
 .password-visibility:hover{background:#f0efff;color:#5148d4}
 .password-visibility:focus-visible{outline:2px solid #6259df;outline-offset:1px}
+
+.patient-back-link{display:inline-flex;align-items:center;gap:6px;margin:0 0 12px;padding:7px 10px;border:1px solid #e7e8f2;border-radius:10px;background:#fff;color:#5e59c9;font-size:12px;font-weight:700}
+@media(max-width:600px){
+ .page-head{margin-bottom:14px}
+ .page-head h1{font-size:24px;letter-spacing:-.5px}
+ .page-head p{font-size:12px;line-height:1.45}
+ .patient-back-link{margin-bottom:9px}
+ .care-tabs{display:none!important}
+ .care-hero,.care-metrics{display:none!important}
+}

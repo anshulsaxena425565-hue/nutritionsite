@@ -642,9 +642,9 @@ export default {
     await env.DB.prepare("UPDATE practice_memberships SET status='active' WHERE practice_id=? AND user_id=? AND role='client' AND status='invited'").bind(invite.practice_id,user.id).run();
     await env.DB.prepare("UPDATE practice_invitations SET status='accepted',accepted_at=? WHERE id=? AND status='pending'").bind(stamp,invite.id).run();
     await env.DB.prepare("UPDATE client_profiles SET onboarding_status='submitted' WHERE practice_id=? AND user_id=?").bind(invite.practice_id,user.id).run();
-    const sessionHeaders=await establishSession(env,user.id,headers);
+    const established=await establishSession(env,user.id,headers);
     await audit(env,user.id,invite.practice_id,"patient.account_activated","patient",user.id);
-    return json({success:true,message:"Patient account activated.",user:{id:user.id,email:user.email,account_type:"client"}},200,sessionHeaders);
+    return json({success:true,message:"Patient account activated.",session_token:established.token,user:{id:user.id,email:user.email,account_type:"client"}},200,established.headers);
    }
    if(path==="/dietitian/patients"&&request.method==="GET") {
     if(!session)return json({success:false,message:"Sign in required."},401,headers);

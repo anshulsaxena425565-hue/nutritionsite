@@ -922,3 +922,30 @@ body{font-size:15px}
 .diet-hero-preview-foot{display:flex;align-items:center;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid #e7e8f3;color:#70779e;font-size:9.5px}.diet-hero-orbit-mark{position:absolute;right:5%;top:18%;display:grid;place-items:center;width:34px;height:34px;border:1px solid #ffffff55;border-radius:50%;background:#ffffff20;color:#fff}
 @media(max-width:850px){.diet-studio-hero{grid-template-columns:minmax(0,1fr) 220px;height:auto;min-height:230px;padding:24px;gap:12px}.diet-hero-preview{width:220px;padding:13px}}
 @media(max-width:600px){.diet-studio-hero{grid-template-columns:1fr;height:auto;min-height:0;padding:24px 20px 20px;gap:12px;border-radius:17px}.diet-hero-copy h2{font-size:28px}.diet-hero-art{height:145px;min-height:145px;justify-content:flex-start;padding-left:8px}.diet-hero-preview{width:235px;transform:rotate(1deg)}.diet-hero-orbit-mark{right:12%;top:3%}.diet-hero-tags{gap:6px}.diet-hero-tags span{font-size:10.5px;padding:6px 8px}}
+
+
+/* Client dashboard navigation simplification + mobile-first notification menu */
+.notification-menu-wrap{position:relative;display:flex;align-items:center}
+.notification-menu-wrap>.icon.active{background:#eeedff;color:#5147d9}
+.notification-dismiss{position:fixed;inset:0;z-index:80;border:0;background:transparent;cursor:default}
+.notification-popover{position:absolute;z-index:81;top:calc(100% + 12px);right:0;width:min(420px,calc(100vw - 28px));max-height:min(72vh,620px);overflow:auto;border:1px solid #e7e8f3;border-radius:18px;background:#fff;box-shadow:0 20px 55px rgba(22,27,75,.18)}
+.notification-popover .notifications-panel{margin:0;border:0;border-radius:18px;box-shadow:none;padding:18px}
+.notification-popover .notifications-panel>.panel-head{align-items:flex-start;gap:12px;margin-bottom:12px}
+.notification-popover .notifications-panel>.panel-head h3{font-size:17px}
+.notification-popover .notifications-panel>.panel-head p{font-size:12px;line-height:1.45}
+.notification-popover .notification-head-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.notification-popover .notification-head-actions .btn{padding:7px 9px;font-size:11px;white-space:nowrap}
+.notification-popover .notification-list{display:grid;gap:0}
+.notification-popover .notification-item{padding:12px 0;gap:10px;border-bottom:1px solid #edf0f6}
+.notification-popover .notification-item:last-child{border-bottom:0}
+.notification-popover .notification-copy h4{font-size:13px}
+.notification-popover .notification-copy p,.notification-popover .notification-copy small{font-size:11px}
+.notification-popover .notification-footnote{font-size:10px;margin:10px 0 0}
+@media(max-width:600px){
+ .notification-popover{position:fixed;top:66px;left:12px;right:12px;width:auto;max-height:calc(100dvh - 82px);border-radius:16px}
+ .notification-popover .notifications-panel{padding:15px}
+ .notification-popover .notifications-panel>.panel-head{display:block}
+ .notification-popover .notification-head-actions{margin-top:10px}
+ .notification-popover .notification-item{grid-template-columns:34px minmax(0,1fr) 28px}
+ .notification-popover .notification-icon{width:34px;height:34px}
+}

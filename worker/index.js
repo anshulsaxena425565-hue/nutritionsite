@@ -689,13 +689,13 @@ export default {
      return json({success:true,entries:rows.results||[]},200,headers);
     }
     const b=await body(request),logDate=clean(b.date,10)||date,amount=Math.round(Number(b.amount_ml));
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(logDate)||!Number.isFinite(Date.parse(logDate+"T12:00:00Z"))||!(amount>0&&amount<=3000))return json({success:false,message:"Enter a valid date and water amount."},400,headers);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(logDate)||!Number.isFinite(Date.parse(logDate+"T12:00:00Z"))||!(amount>0&&amount<=3000))return json({success:false,message:"Enter a valid date and water amount."},400,headers);
     const entryId=id(),stamp=now();
     await env.DB.prepare("INSERT INTO patient_water_logs(id,client_user_id,log_date,amount_ml,created_at) VALUES(?,?,?,?,?)").bind(entryId,session.user_id,logDate,amount,stamp).run();
     await audit(env,session.user_id,null,"patient_water_log.created","patient_water_log",entryId,{date:logDate,amount_ml:amount});
     return json({success:true,message:"Water intake saved.",entry:{id:entryId,date:logDate,amount_ml:amount,created_at:stamp}},201,headers);
    }
-   const waterDelete=path.match(/^\\/client\\/water\\/([a-f0-9-]+)$/);
+   const waterDelete=path.match(/^\/client\/water\/([a-f0-9-]+)$/);
    if(waterDelete&&request.method==="DELETE"){
     if(!session)return json({success:false,message:"Sign in required."},401,headers);
     if(session.account_type!=="client")return json({success:false,message:"Client account required."},403,headers);

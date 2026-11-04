@@ -1,5 +1,12 @@
 {
   "rewrites": [
-    { "source": "/api/platform/(.*)", "destination": "/api/platform?path=$1" }
+    {
+      "source": "/api/platform/(.*)",
+      "destination": "/api/platform?path=$1"
+    },
+    {
+      "source": "/api/worker/:path*",
+      "destination": "https://prachi-nutrition-api.prachisayani-api.workers.dev/:path*"
+    }
   ]
 }

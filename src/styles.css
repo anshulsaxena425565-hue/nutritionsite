@@ -949,3 +949,85 @@ body{font-size:15px}
  .notification-popover .notification-item{grid-template-columns:34px minmax(0,1fr) 28px}
  .notification-popover .notification-icon{width:34px;height:34px}
 }
+
+
+/* Patient-first daily dashboard */
+.patient-home{display:grid;gap:20px}
+.patient-welcome{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;padding:26px 28px;border:1px solid #e7e7fb;border-radius:22px;background:linear-gradient(120deg,#f4f3ff 0%,#fbfbff 60%,#eef9f6 100%)}
+.patient-eyebrow{display:flex;align-items:center;gap:7px;color:#6158d9;font-size:11px;font-weight:800;letter-spacing:1.15px}
+.patient-welcome h2{margin:12px 0 6px;font-size:clamp(24px,3vw,32px);letter-spacing:-.8px;color:#171b3d}
+.patient-welcome p{margin:0;color:#727a99;font-size:14px}
+.patient-date{padding:9px 13px;border-radius:12px;background:#fff;color:#515a7c;font-size:12px;font-weight:700;white-space:nowrap}
+.patient-quick-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.patient-quick-card{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:7px;min-height:164px;padding:18px;border:1px solid #e9ebf4;border-radius:18px;background:#fff;text-align:left;color:#222846;box-shadow:0 4px 16px rgba(26,35,84,.035)}
+.patient-quick-card>span{display:grid;place-items:center;width:40px;height:40px;border-radius:13px;background:#efedff;color:#5d55d9}
+.patient-quick-card b{font-size:15px;margin-top:3px}
+.patient-quick-card>small{color:#8289a4;font-size:12px}
+.patient-quick-card>i{position:absolute;right:17px;top:22px;color:#7770d9;font-style:normal}
+.patient-quick-card.water>span{background:#e7f5ff;color:#2485c9}
+.patient-quick-card.plan>span{background:#e8f7f0;color:#29966c}
+.patient-quick-card.progress>span{background:#fff1e5;color:#c47b2b}
+.patient-quick-card.water strong{font-size:21px;letter-spacing:-.5px}
+.patient-quick-card.water strong small{font-size:12px;color:#858ba2;font-weight:500}
+.patient-water-track{height:7px;width:100%;background:#edf2f8;border-radius:20px;overflow:hidden;margin:2px 0}
+.patient-water-track i{display:block;height:100%;border-radius:20px;background:linear-gradient(90deg,#69b8f3,#4c8ee8);transition:width .25s}
+.patient-water-actions{display:flex;gap:7px}
+.patient-water-actions button{border:1px solid #dce9f8;background:#f4f9ff;color:#2878bd;border-radius:8px;padding:6px 9px;font-size:11px;font-weight:750}
+.patient-water-actions button:disabled{opacity:.5}
+.patient-home-columns{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(300px,.9fr);gap:16px}
+.patient-today-list{display:grid}
+.patient-today-list>div{display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f0f1f6}
+.patient-today-list>div:last-child{border-bottom:0}
+.patient-meal-dot{display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:#f0efff;color:#6159d8}
+.patient-today-list b{font-size:13px;color:#343b5a}
+.patient-today-list p{margin:3px 0 0;color:#777f9b;font-size:12px;line-height:1.4}
+.patient-today-list small{color:#9298ad;font-size:11px}
+.patient-empty{display:grid;justify-items:center;text-align:center;padding:25px 12px;color:#747c99}
+.patient-empty>svg{color:#7972dc;margin-bottom:8px}
+.patient-empty b{font-size:14px;color:#343b5a}
+.patient-empty p{font-size:12px;margin:5px 0 12px}
+.patient-empty button,.patient-text-link{border:0;background:transparent;color:#5c54d6;font-size:12px;font-weight:750}
+.patient-care-links{display:grid}
+.patient-care-links button{display:grid;grid-template-columns:36px minmax(0,1fr) 18px;align-items:center;gap:10px;padding:13px 0;border:0;border-bottom:1px solid #eff0f6;background:transparent;text-align:left;color:#424968}
+.patient-care-links button:last-child{border-bottom:0}
+.patient-care-links button>span{display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:#f1f0ff;color:#655dd7}
+.patient-care-links b{display:block;font-size:13px}
+.patient-care-links small{display:block;margin-top:3px;color:#858ca5;font-size:11px}
+.patient-next-appointment{display:flex;align-items:center;gap:10px;margin-top:10px;padding:12px;border-radius:12px;background:#f5f8ff;color:#5962a4}
+.patient-next-appointment b,.patient-next-appointment small{display:block}
+.patient-next-appointment b{font-size:12px}.patient-next-appointment small{font-size:11px;margin-top:3px;color:#7e86a5}
+.patient-privacy-note{display:flex;align-items:center;gap:7px;margin:0;color:#8b91a8;font-size:11px}
+.patient-privacy-note svg{color:#42a17a;flex:none}
+.patient-food-entry{border-color:#deddf9}
+.patient-food-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.patient-food-form label{display:grid;gap:6px;color:#5f6684;font-size:12px;font-weight:700}
+.patient-food-form label.full{grid-column:1/-1}
+.patient-food-form input,.patient-food-form select{width:100%;min-width:0;border:1px solid #e2e5ef;border-radius:10px;padding:11px 12px;background:#fff;color:#303754;font:inherit;font-size:13px}
+.patient-food-form>.btn{justify-self:start}
+.patient-mobile-nav{display:none}
+@media(max-width:900px){.patient-quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.patient-home-columns{grid-template-columns:1fr}}
+@media(max-width:600px){
+ .patient-home{gap:13px;padding-bottom:10px}
+ .patient-welcome{display:block;padding:19px 17px;border-radius:17px}
+ .patient-welcome h2{font-size:24px;line-height:1.18}
+ .patient-welcome p{font-size:12px;line-height:1.5}
+ .patient-date{display:inline-flex;margin-top:12px;font-size:11px}
+ .patient-quick-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ .patient-quick-card{min-height:150px;padding:13px;border-radius:15px;gap:6px}
+ .patient-quick-card>span{width:35px;height:35px;border-radius:11px}
+ .patient-quick-card b{font-size:13px}
+ .patient-quick-card>small{font-size:10.5px}
+ .patient-quick-card.water strong{font-size:18px}
+ .patient-water-actions{gap:5px}.patient-water-actions button{padding:6px 7px;font-size:10px}
+ .patient-home-columns{gap:12px}
+ .patient-home .panel{padding:15px;border-radius:15px}
+ .patient-home .panel-head h3{font-size:15px}
+ .patient-food-form{grid-template-columns:1fr}
+ .patient-food-form label.full{grid-column:auto}
+ .patient-mobile-nav{position:fixed;z-index:60;display:grid;grid-template-columns:repeat(5,1fr);left:10px;right:10px;bottom:max(9px,env(safe-area-inset-bottom));padding:7px 5px calc(7px + env(safe-area-inset-bottom));border:1px solid #e8e8f3;border-radius:17px;background:rgba(255,255,255,.96);backdrop-filter:blur(16px);box-shadow:0 8px 30px rgba(26,31,75,.15)}
+ .patient-mobile-nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:0;border:0;border-radius:11px;padding:7px 2px;background:transparent;color:#858ba5;font-size:10px;font-weight:650}
+ .patient-mobile-nav button.active{background:#f0efff;color:#554bd0}
+ .patient-mobile-nav button span{line-height:1}
+ body:has(.patient-mobile-nav) .content{padding-bottom:100px}
+ body:has(.patient-mobile-nav) .sidebar{padding-bottom:92px}
+}

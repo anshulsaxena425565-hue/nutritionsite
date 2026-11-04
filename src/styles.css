@@ -1031,3 +1031,9 @@ body{font-size:15px}
  body:has(.patient-mobile-nav) .content{padding-bottom:100px}
  body:has(.patient-mobile-nav) .sidebar{padding-bottom:92px}
 }
+
+.password-input-wrap{position:relative;display:flex;align-items:center;width:100%}
+.password-input-wrap>input{width:100%;min-width:0;padding-right:48px!important}
+.password-visibility{position:absolute;right:7px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:9px;background:transparent;color:#747b98;cursor:pointer;z-index:2}
+.password-visibility:hover{background:#f0efff;color:#5148d4}
+.password-visibility:focus-visible{outline:2px solid #6259df;outline-offset:1px}

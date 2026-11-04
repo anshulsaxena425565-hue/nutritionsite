@@ -678,6 +678,32 @@ export default {
     await audit(env,session.user_id,null,"patient_measurement.deleted","patient_measurement",existing.id);
     return json({success:true,message:"Measurement deleted."},200,headers);
    }
+   // Patient hydration log, stored server-side and scoped to the signed-in client.
+   if(path==="/client/water"&&(request.method==="GET"||request.method==="POST")){
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    if(session.account_type!=="client")return json({success:false,message:"Client account required."},403,headers);
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS patient_water_logs (id TEXT PRIMARY KEY, client_user_id TEXT NOT NULL, log_date TEXT NOT NULL, amount_ml INTEGER NOT NULL CHECK(amount_ml>0 AND amount_ml<=3000), created_at TEXT NOT NULL)").run();
+    const date=clean(url.searchParams.get("date"),10)||new Date().toISOString().slice(0,10);
+    if(request.method==="GET"){
+     const rows=await env.DB.prepare("SELECT id,log_date AS date,amount_ml,created_at FROM patient_water_logs WHERE client_user_id=? AND log_date=? ORDER BY created_at").bind(session.user_id,date).all();
+     return json({success:true,entries:rows.results||[]},200,headers);
+    }
+    const b=await body(request),logDate=clean(b.date,10)||date,amount=Math.round(Number(b.amount_ml));
+    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(logDate)||!Number.isFinite(Date.parse(logDate+"T12:00:00Z"))||!(amount>0&&amount<=3000))return json({success:false,message:"Enter a valid date and water amount."},400,headers);
+    const entryId=id(),stamp=now();
+    await env.DB.prepare("INSERT INTO patient_water_logs(id,client_user_id,log_date,amount_ml,created_at) VALUES(?,?,?,?,?)").bind(entryId,session.user_id,logDate,amount,stamp).run();
+    await audit(env,session.user_id,null,"patient_water_log.created","patient_water_log",entryId,{date:logDate,amount_ml:amount});
+    return json({success:true,message:"Water intake saved.",entry:{id:entryId,date:logDate,amount_ml:amount,created_at:stamp}},201,headers);
+   }
+   const waterDelete=path.match(/^\\/client\\/water\\/([a-f0-9-]+)$/);
+   if(waterDelete&&request.method==="DELETE"){
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    if(session.account_type!=="client")return json({success:false,message:"Client account required."},403,headers);
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS patient_water_logs (id TEXT PRIMARY KEY, client_user_id TEXT NOT NULL, log_date TEXT NOT NULL, amount_ml INTEGER NOT NULL CHECK(amount_ml>0 AND amount_ml<=3000), created_at TEXT NOT NULL)").run();
+    const result=await env.DB.prepare("DELETE FROM patient_water_logs WHERE id=? AND client_user_id=?").bind(waterDelete[1],session.user_id).run();
+    if(!result.meta?.changes)return json({success:false,message:"Water entry not found."},404,headers);
+    return json({success:true,message:"Water entry deleted."},200,headers);
+   }
    // Patient-entered daily food diary, shared with the connected dietitian.
    if(path==="/client/food-diary"&&(request.method==="GET"||request.method==="POST")) {
     if(!session)return json({success:false,message:"Sign in required."},401,headers);

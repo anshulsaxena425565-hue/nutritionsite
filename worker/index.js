@@ -844,7 +844,7 @@ export default {
     if(!session)return json({success:false,message:"Sign in required."},401,headers);
     if(session.account_type!=="dietitian"||session.is_platform_admin)return json({success:false,message:"Dietitian access required."},403,headers);
     const practiceId=clean(url.searchParams.get("practice_id"),80),clientId=clean(url.searchParams.get("client_user_id"),80),date=clean(url.searchParams.get("date"),10);
-    if(!practiceId||!clientId||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+"T12:00:00Z")))return json({success:false,message:"Practice, patient and a valid diary date are required."},400,headers);
+    if(!practiceId||!clientId||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+"T12:00:00Z")))return json({success:false,message:"Practice, patient and a valid diary date are required."},400,headers);
     const member=session.memberships.find(m=>m.practice_id===practiceId&&m.role==="dietitian"&&m.status==="active");
     if(!member)return json({success:false,message:"Active dietitian practice membership required."},403,headers);
     const connected=await env.DB.prepare("SELECT 1 AS ok FROM dietitian_requests WHERE practice_id=? AND client_user_id=? AND dietitian_user_id=? AND status='accepted' UNION SELECT 1 AS ok FROM client_profiles WHERE practice_id=? AND user_id=? AND assigned_dietitian_user_id=? LIMIT 1").bind(practiceId,clientId,session.user_id,practiceId,clientId,session.user_id).first();

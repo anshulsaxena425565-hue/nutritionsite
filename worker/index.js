@@ -840,6 +840,19 @@ export default {
     const rows=await env.DB.prepare("SELECT f.id,f.diary_date AS date,f.meal_slot,f.meal_time,f.food_description,f.quantity,f.note,f.created_at,u.display_name AS recorded_by_name FROM patient_food_diary f LEFT JOIN app_users u ON u.id=f.recorded_by_user_id WHERE f.client_user_id=? AND (?='' OR f.diary_date=?) ORDER BY f.diary_date DESC,CASE f.meal_slot WHEN 'Early morning' THEN 1 WHEN 'Breakfast' THEN 2 WHEN 'Mid-morning' THEN 3 WHEN 'Lunch' THEN 4 WHEN 'Evening snack' THEN 5 WHEN 'Dinner' THEN 6 WHEN 'Bedtime' THEN 7 ELSE 8 END,f.meal_time,f.created_at LIMIT 1000").bind(clientId,date,date).all();
     return json({success:true,entries:rows.results||[]},200,headers);
    }
+   if(path==="/dietitian/patient-water"&&request.method==="GET"){
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    if(session.account_type!=="dietitian"||session.is_platform_admin)return json({success:false,message:"Dietitian access required."},403,headers);
+    const practiceId=clean(url.searchParams.get("practice_id"),80),clientId=clean(url.searchParams.get("client_user_id"),80),date=clean(url.searchParams.get("date"),10);
+    if(!practiceId||!clientId||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+"T12:00:00Z")))return json({success:false,message:"Practice, patient and a valid diary date are required."},400,headers);
+    const member=session.memberships.find(m=>m.practice_id===practiceId&&m.role==="dietitian"&&m.status==="active");
+    if(!member)return json({success:false,message:"Active dietitian practice membership required."},403,headers);
+    const connected=await env.DB.prepare("SELECT 1 AS ok FROM dietitian_requests WHERE practice_id=? AND client_user_id=? AND dietitian_user_id=? AND status='accepted' UNION SELECT 1 AS ok FROM client_profiles WHERE practice_id=? AND user_id=? AND assigned_dietitian_user_id=? LIMIT 1").bind(practiceId,clientId,session.user_id,practiceId,clientId,session.user_id).first();
+    if(!connected)return json({success:false,message:"Connected patient not found in this practice."},404,headers);
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS patient_water_logs (id TEXT PRIMARY KEY, client_user_id TEXT NOT NULL, log_date TEXT NOT NULL, amount_ml INTEGER NOT NULL CHECK(amount_ml>0 AND amount_ml<=3000), created_at TEXT NOT NULL)").run();
+    const rows=await env.DB.prepare("SELECT id,log_date AS date,amount_ml,created_at FROM patient_water_logs WHERE client_user_id=? AND log_date=? ORDER BY created_at ASC").bind(clientId,date).all();
+    return json({success:true,entries:rows.results||[]},200,headers);
+   }
    // Practice-scoped clinical nutrition record for an actively connected patient.
    if(path==="/dietitian/clinical-record"&&(request.method==="GET"||request.method==="POST")) {
     if(!session)return json({success:false,message:"Sign in required."},401,headers);

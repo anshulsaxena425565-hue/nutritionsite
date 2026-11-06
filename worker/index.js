@@ -157,6 +157,7 @@ export default {
     await audit(env,uid,null,"platform_admin.bootstrap","user",uid);
     return json({success:true,message:"Super Admin allowlisted. Sign in using email code."},201,headers);
    }
+   if(path==="/theme"&&request.method==="GET"){await env.DB.prepare("CREATE TABLE IF NOT EXISTS platform_branding_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_by TEXT)").run();const row=await env.DB.prepare("SELECT setting_value FROM platform_branding_settings WHERE setting_key='primary_color'").first();return json({success:true,theme:{primary_color:row?.setting_value||"#5A52D5"}},200,headers)}
    const session=await getSession(request,env);
    // Entitlement switches are enforced server-side for mapped dietitian API features.
    // Keep the platform administrator exempt so they can always support and inspect accounts.
@@ -213,6 +214,7 @@ export default {
     if(!session?.is_platform_admin) return json({success:false,message:"Platform administrator access required."},session?403:401,headers);
  
 
+   if(path==="/admin/theme"&&request.method==="POST"){const b=await body(request),color=String(b.primary_color||"").toUpperCase();if(!/^#[0-9A-F]{6}$/.test(color))return json({success:false,message:"Enter a valid six-digit HEX colour."},400,headers);await env.DB.prepare("CREATE TABLE IF NOT EXISTS platform_branding_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_by TEXT)").run();await env.DB.prepare("INSERT INTO platform_branding_settings(setting_key,setting_value,updated_at,updated_by) VALUES('primary_color',?,CURRENT_TIMESTAMP,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=CURRENT_TIMESTAMP,updated_by=excluded.updated_by").bind(color,session.user_id).run();await audit(env,session.user_id,null,"platform.branding.updated","branding","primary_color",{primary_color:color});return json({success:true,message:"Brand theme updated.",theme:{primary_color:color}},200,headers)}
    if(path==="/admin/module-controls"&&request.method==="GET"){
     const moduleInfo={
      overview:["Overview","Core dashboard landing page."],

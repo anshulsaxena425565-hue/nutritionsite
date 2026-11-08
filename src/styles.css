@@ -1221,3 +1221,5 @@ td b{color:#2e3a54}
 .patient-connection-card>button{display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:0 0 auto;border:0;border-radius:999px;padding:10px 16px;background:#315a45;color:#fff;font-weight:700;cursor:pointer}
 .patient-connection-card>button:hover{background:#244735}
 @media(max-width:560px){.patient-connection-card{align-items:flex-start;gap:11px;padding:15px}.patient-connection-icon{width:40px;height:40px;flex-basis:40px}.patient-connection-copy>b{font-size:14px}.patient-connection-card>button{padding:9px 11px;font-size:12px}}
+
+.care-connected-dietitian{margin-top:16px;margin-bottom:20px}

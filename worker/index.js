@@ -16,9 +16,9 @@ function cors(request) {
 const SESSION_TTL_SECONDS = 12 * 60 * 60;
 const SESSION_TTL_MS = SESSION_TTL_SECONDS * 1000;
 function cookie(name, value, maxAge) { return name+"="+value+"; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age="+maxAge; }
-function createSessionCookie(raw) { return cookie("pn_session", raw, SESSION_TTL_SECONDS); }
-function clearSessionCookie() { return cookie("pn_session", "", 0); }
-function readSessionCookie(request) { return (request.headers.get("Cookie") || "").split(";").map(s => s.trim()).find(s => s.startsWith("pn_session="))?.slice("pn_session=".length) || ""; }
+function createSessionCookie(raw) { return cookie("__Host-pn_session", raw, SESSION_TTL_SECONDS); }
+function clearSessionCookie() { return cookie("__Host-pn_session", "", 0); }
+function readSessionCookie(request) { return (request.headers.get("Cookie") || "").split(";").map(s => s.trim()).find(s => s.startsWith("__Host-pn_session="))?.slice("__Host-pn_session=".length) || ""; }
 async function consumeRateLimit(env, scope, value, maxHits, windowMs) {
   if (!env.RATE_LIMIT_SECRET || String(env.RATE_LIMIT_SECRET).length < 32) throw new Error("rate_limit_not_configured");
   const windowStart = Math.floor(Date.now() / windowMs) * windowMs;

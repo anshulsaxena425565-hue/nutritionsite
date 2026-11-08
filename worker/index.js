@@ -54,7 +54,7 @@ async function passwordHash(password) {
 async function passwordMatches(password, stored) {
   if (typeof stored !== "string") return { valid: false, needsUpgrade: false };
   if (stored.startsWith("pbkdf2-sha256$")) {
-    const [, algorithm, iterationsText, saltHex, expected] = stored.split("$");
+    const [algorithm, iterationsText, saltHex, expected] = stored.split("$");
     const iterations = Number(iterationsText);
     if (algorithm !== "pbkdf2-sha256" || !Number.isInteger(iterations) || iterations < 600000 || iterations > 2000000 || !/^[a-f0-9]{32}$/.test(saltHex || "") || !/^[a-f0-9]{64}$/.test(expected || "")) return { valid: false, needsUpgrade: false };
     const salt = Uint8Array.from(saltHex.match(/.{2}/g).map(x => parseInt(x, 16)));

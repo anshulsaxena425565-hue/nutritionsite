@@ -9,7 +9,7 @@ const emailOk = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e.length <= 254;
 const now = () => new Date().toISOString();
 function cors(request) {
   const origin = request.headers.get("Origin") || "";
-  const h = { "Vary": "Origin", "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-PN-CSRF", "Access-Control-Allow-Credentials": "true", "Access-Control-Max-Age": "600" };
+  const h = { "Vary": "Origin", "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-PN-CSRF", "Access-Control-Allow-Credentials": "true", "Access-Control-Max-Age": "600", "X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY", "Referrer-Policy": "no-referrer", "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()", "Cross-Origin-Opener-Policy": "same-origin", "Strict-Transport-Security": "max-age=31536000", "Content-Security-Policy": "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" };
   if (ORIGIN_ALLOWLIST.has(origin)) h["Access-Control-Allow-Origin"] = origin;
   return h;
 }

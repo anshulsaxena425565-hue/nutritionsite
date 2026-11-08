@@ -34,7 +34,7 @@ async function isAuthRateLimited(env, request, scope, identity, ipLimit, identit
   const identityLimited = identity ? await consumeRateLimit(env, scope+":identity", identity, identityLimit, windowMs) : false;
   return ipLimited || identityLimited;
 }
-async function body(request)async function body(request) { const len = Number(request.headers.get("Content-Length") || 0); if (len > 1600000) throw new Error("too_large"); const text = await request.text(); if (new TextEncoder().encode(text).byteLength > 1600000) throw new Error("too_large"); return JSON.parse(text || "{}"); }
+async function body(request) { const len = Number(request.headers.get("Content-Length") || 0); if (len > 1600000) throw new Error("too_large"); const text = await request.text(); if (new TextEncoder().encode(text).byteLength > 1600000) throw new Error("too_large"); return JSON.parse(text || "{}"); }
 async function sendOtp(env, to, code) {
   if (!env.RESEND_API_KEY || !env.MAIL_FROM) throw new Error("email_not_configured");
   const r = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject: "Your secure sign-in code", text: `Your sign-in code is ${code}. It expires in 10 minutes. If you did not request this, you can ignore this email.`, html: `<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px"><h2>Sign in securely</h2><p>Your one-time code is:</p><p style="font-size:32px;font-weight:700;letter-spacing:8px">${code}</p><p>This code expires in 10 minutes. Never share it with anyone.</p></div>` }) });

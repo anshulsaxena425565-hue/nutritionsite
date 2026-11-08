@@ -120,61 +120,68 @@ export default {
    }
    if (path === "/auth/register" && request.method === "POST") {
     const b=await body(request),name=clean(b.full_name,120),email=clean(b.email,254).toLowerCase(),phone=clean(b.mobile,24).replace(/[\\s()+.-]/g,""),password=b.password,accountType=b.account_type==="dietitian"?"dietitian":"client";
+    if(!env.RATE_LIMIT_SECRET) return json({success:false,message:"Authentication protection is not configured. Please contact support."},503,headers);
+    if(await isAuthRateLimited(env,request,"register",email,5,3,60*60*1000)) return json({success:false,message:"Too many account attempts. Please try again later."},429,{...headers,"Retry-After":"3600"});
     if(name.length<2||!emailOk(email)||!/^[0-9]{7,15}$/.test(phone)||!validPassword(password))
       return json({success:false,message:"Enter your name, a valid email, mobile number and a password of at least 10 characters containing letters and numbers."},400,headers);
     const existing=await env.DB.prepare("SELECT id FROM app_users WHERE email=? COLLATE NOCASE OR phone=? LIMIT 1").bind(email,phone).first();
     if(existing)return json({success:false,message:"An account already exists for that email or mobile. Sign in instead, or use account recovery."},409,headers);
     const userId=id(),stored=await passwordHash(password);
     await env.DB.prepare("INSERT INTO app_users(id,email,display_name,phone,password_hash,status,account_type) VALUES(?,?,?,?,?,'active',?)").bind(userId,email,name,phone,stored,accountType).run();
-    const established=await establishSession(env,userId,headers);
+    const established=await establishSession(env,userId);
     await audit(env,userId,null,"auth.register","user",userId);
-    return json({success:true,message:"Account created.",session_token:established.token,user:{id:userId,email,display_name:name,account_type:accountType}},201,established.headers);
+    return json({success:true,message:"Account created.",user:{id:userId,email,display_name:name,account_type:accountType}},201,{...headers,"Set-Cookie":established.setCookie});
    }
    if (path === "/auth/login" && request.method === "POST") {
     const b=await body(request),identifier=clean(b.identifier,254).toLowerCase(),password=b.password;
     if(!identifier||typeof password!=="string"||password.length>128)return json({success:false,message:"Enter your email/mobile and password."},400,headers);
+    if(!env.RATE_LIMIT_SECRET) return json({success:false,message:"Authentication protection is not configured. Please contact support."},503,headers);
+    if(await isAuthRateLimited(env,request,"login",identifier,30,8,15*60*1000)) return json({success:false,message:"Too many sign-in attempts. Please wait before trying again."},429,{...headers,"Retry-After":"900"});
     const user=await env.DB.prepare("SELECT id,email,display_name,status,password_hash,account_type FROM app_users WHERE (email=? COLLATE NOCASE OR phone=?) LIMIT 1").bind(identifier,identifier.replace(/[\\s()+.-]/g,"")).first();
-    if(!user||user.status!=="active"||!(await passwordMatches(password,user.password_hash)))return json({success:false,message:"Email/mobile or password is incorrect."},401,headers);
-    const established=await establishSession(env,user.id,headers);
-    return json({success:true,message:"Signed in.",session_token:established.token,user:{id:user.id,email:user.email,display_name:user.display_name,account_type:user.account_type||"client"}},200,established.headers);
+    const passwordCheck = user && user.status==="active" ? await passwordMatches(password,user.password_hash) : {valid:false,needsUpgrade:false};
+    if(!passwordCheck.valid)return json({success:false,message:"Email/mobile or password is incorrect."},401,headers);
+    if(passwordCheck.needsUpgrade) await env.DB.prepare("UPDATE app_users SET password_hash=? WHERE id=?").bind(await passwordHash(password),user.id).run();
+    const established=await establishSession(env,user.id);
+    return json({success:true,message:"Signed in.",user:{id:user.id,email:user.email,display_name:user.display_name,account_type:user.account_type||"client"}},200,{...headers,"Set-Cookie":established.setCookie});
    }
    if (path === "/auth/request-code" && request.method === "POST") {
     const b=await body(request), email=clean(b.email,254).toLowerCase();
     if(!emailOk(email)) return json({success:false,message:"Enter a valid email address."},400,headers);
+    if(!env.RATE_LIMIT_SECRET) return json({success:false,message:"Authentication protection is not configured. Please contact support."},503,headers);
+    if(await isAuthRateLimited(env,request,"otp-request",email,5,3,60*60*1000)) return json({success:true,message:"If this email is eligible, a sign-in code will arrive shortly."},200,headers);
     const recent=await env.DB.prepare("SELECT created_at FROM auth_challenges WHERE email=? AND purpose='login' ORDER BY created_at DESC LIMIT 1").bind(email).first();
     if(recent && Date.now()-Date.parse(recent.created_at)<60000) return json({success:true,message:"If this email is eligible, a sign-in code will arrive shortly."},200,headers);
-    // Do not disclose whether an account exists.
     const user=await env.DB.prepare("SELECT id,status FROM app_users WHERE email=? COLLATE NOCASE").bind(email).first();
     if(user && user.status==="active") {
       if(!env.RESEND_API_KEY||!env.MAIL_FROM) return json({success:false,message:"Secure sign-in email is not configured on the server yet."},503,headers);
       const code=String(crypto.getRandomValues(new Uint32Array(1))[0]%1000000).padStart(6,"0"), challengeId=id(), salt=randomToken(16);
       await env.DB.prepare("INSERT INTO auth_challenges(id,email,purpose,code_hash,attempts,expires_at) VALUES(?,?, 'login', ?,0,?)").bind(challengeId,email,await hash(salt+":"+code),new Date(Date.now()+10*60*1000).toISOString()).run();
       try { await sendOtp(env,email,code); } catch { await env.DB.prepare("DELETE FROM auth_challenges WHERE id=?").bind(challengeId).run(); return json({success:false,message:"Could not send the sign-in email. Please try again later."},503,headers); }
-      // Store salt with the hash to avoid storing the code itself.
       await env.DB.prepare("UPDATE auth_challenges SET code_hash=? WHERE id=?").bind(salt+":"+await hash(salt+":"+code),challengeId).run();
     }
     return json({success:true,message:"If this email is eligible, a sign-in code will arrive shortly."},200,headers);
    }
    if (path === "/auth/verify-code" && request.method === "POST") {
     const b=await body(request), email=clean(b.email,254).toLowerCase(), code=clean(b.code,6);
-    if(!emailOk(email)||!/^\d{6}$/.test(code)) return json({success:false,message:"Invalid or expired code."},400,headers);
+    if(!emailOk(email)||!/^\\d{6}$/.test(code)) return json({success:false,message:"Invalid or expired code."},400,headers);
+    if(!env.RATE_LIMIT_SECRET) return json({success:false,message:"Authentication protection is not configured. Please contact support."},503,headers);
+    if(await isAuthRateLimited(env,request,"otp-verify",email,20,5,15*60*1000)) return json({success:false,message:"Invalid or expired code."},429,{...headers,"Retry-After":"900"});
     const challenge=await env.DB.prepare("SELECT * FROM auth_challenges WHERE email=? AND purpose='login' AND consumed_at IS NULL AND expires_at>? ORDER BY created_at DESC LIMIT 1").bind(email,now()).first();
     if(!challenge||challenge.attempts>=5) return json({success:false,message:"Invalid or expired code."},400,headers);
     const [salt,stored]=challenge.code_hash.split(":");
     const valid=stored===await hash(salt+":"+code);
-    if(!valid){await env.DB.prepare("UPDATE auth_challenges SET attempts=attempts+1 WHERE id=?").bind(challenge.id).run();return json({success:false,message:"Invalid or expired code."},400,headers);}
+    if(!valid){await env.DB.prepare("UPDATE auth_challenges SET attempts=attempts+1 WHERE id=? AND attempts<5").bind(challenge.id).run();return json({success:false,message:"Invalid or expired code."},400,headers);}
     const user=await env.DB.prepare("SELECT id FROM app_users WHERE email=? COLLATE NOCASE AND status='active'").bind(email).first();
     if(!user) return json({success:false,message:"Invalid or expired code."},400,headers);
-    await env.DB.prepare("UPDATE auth_challenges SET consumed_at=? WHERE id=? AND consumed_at IS NULL").bind(now(),challenge.id).run();
-    const raw=randomToken(32), expires=new Date(Date.now()+7*24*60*60*1000).toISOString();
-    await env.DB.prepare("INSERT INTO auth_sessions(id,user_id,token_hash,expires_at,last_seen_at) VALUES(?,?,?,?,?)").bind(id(),user.id,await hash(raw),expires,now()).run();
-    return json({success:true,message:"Signed in.",session_token:raw},200,headers);
+    const consumed=await env.DB.prepare("UPDATE auth_challenges SET consumed_at=? WHERE id=? AND consumed_at IS NULL AND expires_at>? AND attempts<5").bind(now(),challenge.id,now()).run();
+    if(!consumed.meta?.changes) return json({success:false,message:"Invalid or expired code."},400,headers);
+    const established=await establishSession(env,user.id);
+    return json({success:true,message:"Signed in."},200,{...headers,"Set-Cookie":established.setCookie});
    }
    if (path === "/auth/logout" && request.method === "POST") {
-    const bearer=request.headers.get("Authorization")||"";
-    const raw=bearer.startsWith("Bearer ")?bearer.slice(7).trim():(request.headers.get("Cookie")||"").split(";").map(s=>s.trim()).find(s=>s.startsWith("pn_session="))?.slice(11);
+    const raw=readSessionCookie(request);
     if(raw) await env.DB.prepare("UPDATE auth_sessions SET revoked_at=? WHERE token_hash=? AND revoked_at IS NULL").bind(now(),await hash(raw)).run();
-    return json({success:true},200,{...headers,"Set-Cookie":cookie("pn_session","",0)});
+    return json({success:true},200,{...headers,"Set-Cookie":clearSessionCookie()});
    }
    if (path === "/auth/me" && request.method === "GET") {
     const s=await getSession(request,env); if(!s)return json({success:false,message:"Not signed in."},401,headers);
@@ -1004,6 +1011,7 @@ export default {
   } catch (e) {
    console.error("API request failed", { path, message: String(e?.message || e), stack: String(e?.stack || "").slice(0,1200) });
    if(e?.message==="too_large") return json({success:false,message:"Request too large."},413,headers);
+   if(e?.message==="rate_limit_not_configured") return json({success:false,message:"Authentication protection is not configured. Please contact support."},503,headers);
    if(e instanceof SyntaxError) return json({success:false,message:"Invalid JSON."},400,headers);
    return json({success:false,message:"The service encountered an error. Please try again later."},500,headers);
   }

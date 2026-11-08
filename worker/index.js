@@ -22,6 +22,7 @@ function readSessionCookie(request) { return (request.headers.get("Cookie") || "
 async function consumeRateLimit(env, scope, value, maxHits, windowMs) {
   if (!env.RATE_LIMIT_SECRET || String(env.RATE_LIMIT_SECRET).length < 32) throw new Error("rate_limit_not_configured");
   const windowStart = Math.floor(Date.now() / windowMs) * windowMs;
+  await env.DB.prepare("DELETE FROM auth_rate_limits WHERE expires_at < ?").bind(Date.now()).run();
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.RATE_LIMIT_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const digest = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(scope+":"+value+":"+windowStart));
   const bucket = hex(digest);

@@ -1,5 +1,5 @@
 const ORIGIN_ALLOWLIST = new Set(["https://prachisayani.online", "https://www.prachisayani.online", "https://anshulsaxena425565-hue.github.io"]);
-const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...headers } });
+const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY", "Referrer-Policy": "no-referrer", "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()", "Cross-Origin-Opener-Policy": "same-origin", "Strict-Transport-Security": "max-age=31536000", "Content-Security-Policy": "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'", ...headers } });
 const id = () => crypto.randomUUID();
 const hex = (b) => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
 const hash = async (s) => hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)));
@@ -9,35 +9,72 @@ const emailOk = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e.length <= 254;
 const now = () => new Date().toISOString();
 function cors(request) {
   const origin = request.headers.get("Origin") || "";
-  const h = { "Vary": "Origin", "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, Authorization", "Access-Control-Allow-Credentials": "false" };
+  const h = { "Vary": "Origin", "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-PN-CSRF", "Access-Control-Allow-Credentials": "true", "Access-Control-Max-Age": "600" };
   if (ORIGIN_ALLOWLIST.has(origin)) h["Access-Control-Allow-Origin"] = origin;
   return h;
 }
-function cookie(name, value, maxAge) { return `${name}=${value}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=${maxAge}`; }
-async function body(request) { const len = Number(request.headers.get("Content-Length") || 0); if (len > 1600000) throw new Error("too_large"); const text = await request.text(); if (new TextEncoder().encode(text).byteLength > 1600000) throw new Error("too_large"); return JSON.parse(text || "{}"); }
+const SESSION_TTL_SECONDS = 12 * 60 * 60;
+const SESSION_TTL_MS = SESSION_TTL_SECONDS * 1000;
+function cookie(name, value, maxAge) { return name+"="+value+"; Path=/; HttpOnly; Secure; SameSite=None; Max-Age="+maxAge; }
+function createSessionCookie(raw) { return cookie("pn_session", raw, SESSION_TTL_SECONDS); }
+function clearSessionCookie() { return cookie("pn_session", "", 0); }
+function readSessionCookie(request) { return (request.headers.get("Cookie") || "").split(";").map(s => s.trim()).find(s => s.startsWith("pn_session="))?.slice("pn_session=".length) || ""; }
+async function consumeRateLimit(env, scope, value, maxHits, windowMs) {
+  if (!env.RATE_LIMIT_SECRET || String(env.RATE_LIMIT_SECRET).length < 32) throw new Error("rate_limit_not_configured");
+  const windowStart = Math.floor(Date.now() / windowMs) * windowMs;
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.RATE_LIMIT_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const digest = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(scope+":"+value+":"+windowStart));
+  const bucket = hex(digest);
+  const row = await env.DB.prepare("INSERT INTO auth_rate_limits(bucket_key,window_start,expires_at,hits) VALUES(?,?,?,1) ON CONFLICT(bucket_key) DO UPDATE SET hits=hits+1 RETURNING hits").bind(bucket, windowStart, windowStart + windowMs).first();
+  return Number(row?.hits || 0) > maxHits;
+}
+async function isAuthRateLimited(env, request, scope, identity, ipLimit, identityLimit, windowMs) {
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const ipLimited = await consumeRateLimit(env, scope+":ip", ip, ipLimit, windowMs);
+  const identityLimited = identity ? await consumeRateLimit(env, scope+":identity", identity, identityLimit, windowMs) : false;
+  return ipLimited || identityLimited;
+}
+async function body(request)async function body(request) { const len = Number(request.headers.get("Content-Length") || 0); if (len > 1600000) throw new Error("too_large"); const text = await request.text(); if (new TextEncoder().encode(text).byteLength > 1600000) throw new Error("too_large"); return JSON.parse(text || "{}"); }
 async function sendOtp(env, to, code) {
   if (!env.RESEND_API_KEY || !env.MAIL_FROM) throw new Error("email_not_configured");
   const r = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject: "Your secure sign-in code", text: `Your sign-in code is ${code}. It expires in 10 minutes. If you did not request this, you can ignore this email.`, html: `<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px"><h2>Sign in securely</h2><p>Your one-time code is:</p><p style="font-size:32px;font-weight:700;letter-spacing:8px">${code}</p><p>This code expires in 10 minutes. Never share it with anyone.</p></div>` }) });
   if (!r.ok) throw new Error("email_send_failed");
 }
-async function passwordHash(password, saltHex) {
-  const salt = saltHex ? Uint8Array.from(saltHex.match(/.{2}/g).map(x=>parseInt(x,16))) : crypto.getRandomValues(new Uint8Array(16));
+const PASSWORD_ITERATIONS = 600000;
+async function derivePasswordBits(password, salt, iterations) {
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations:100000,hash:"SHA-256"},key,256);
-  return hex(salt)+":"+hex(bits);
+  return hex(await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations, hash: "SHA-256" }, key, 256));
+}
+function constantTimeHexEqual(a, b) { if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false; let diff = 0; for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i); return diff === 0; }
+async function passwordHash(password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const derived = await derivePasswordBits(password, salt, PASSWORD_ITERATIONS);
+  return "pbkdf2-sha256$"+PASSWORD_ITERATIONS+"$"+hex(salt)+"$"+derived;
 }
 async function passwordMatches(password, stored) {
-  if(!stored || !stored.includes(":")) return false;
-  const [salt, expected] = stored.split(":");
-  return expected === (await passwordHash(password,salt)).split(":")[1];
+  if (typeof stored !== "string") return { valid: false, needsUpgrade: false };
+  if (stored.startsWith("pbkdf2-sha256$")) {
+    const [, algorithm, iterationsText, saltHex, expected] = stored.split("$");
+    const iterations = Number(iterationsText);
+    if (algorithm !== "pbkdf2-sha256" || !Number.isInteger(iterations) || iterations < 600000 || iterations > 2000000 || !/^[a-f0-9]{32}$/.test(saltHex || "") || !/^[a-f0-9]{64}$/.test(expected || "")) return { valid: false, needsUpgrade: false };
+    const salt = Uint8Array.from(saltHex.match(/.{2}/g).map(x => parseInt(x, 16)));
+    return { valid: constantTimeHexEqual(expected, await derivePasswordBits(password, salt, iterations)), needsUpgrade: false };
+  }
+  if (!stored.includes(":")) return { valid: false, needsUpgrade: false };
+  const [saltHex, expected] = stored.split(":");
+  if (!/^[a-f0-9]{32}$/.test(saltHex || "") || !/^[a-f0-9]{64}$/.test(expected || "")) return { valid: false, needsUpgrade: false };
+  const salt = Uint8Array.from(saltHex.match(/.{2}/g).map(x => parseInt(x, 16)));
+  return { valid: constantTimeHexEqual(expected, await derivePasswordBits(password, salt, 100000)), needsUpgrade: true };
 }
 function validPassword(p){return typeof p==="string" && p.length>=10 && p.length<=128 && /[A-Za-z]/.test(p) && /[0-9]/.test(p);}
-function createSessionCookie(raw){return cookie("pn_session",raw,7*24*60*60);}
-async function establishSession(env,userId,headers){
-  const raw=randomToken(32), expires=new Date(Date.now()+7*24*60*60*1000).toISOString();
+async function establishSession(env,userId){
+  const raw=randomToken(32), expires=new Date(Date.now()+SESSION_TTL_MS).toISOString();
   await env.DB.prepare("INSERT INTO auth_sessions(id,user_id,token_hash,expires_at,last_seen_at) VALUES(?,?,?,?,?)").bind(id(),userId,await hash(raw),expires,now()).run();
-  return {headers,token:raw};
+  return { token: raw, setCookie: createSessionCookie(raw) };
 }
+async function getSession(request, env) {
+  const raw = readSessionCookie(request);
+  if (!raw) return null;
 async function getSession(request, env) {
   const bearer = request.headers.get("Authorization") || "";
   const raw = bearer.startsWith("Bearer ") ? bearer.slice(7).trim() : (request.headers.get("Cookie") || "").split(";").map(s => s.trim()).find(s => s.startsWith("pn_session="))?.slice("pn_session=".length);
@@ -68,6 +105,7 @@ export default {
   const origin = request.headers.get("Origin");
   if (origin && !ORIGIN_ALLOWLIST.has(origin)) return json({ success:false, message:"Origin not allowed." },403);
   if (request.method === "OPTIONS") return new Response(null,{status:204,headers});
+  if (!["GET","HEAD"].includes(request.method) && (!origin || !ORIGIN_ALLOWLIST.has(origin) || request.headers.get("X-PN-CSRF") !== "1")) return json({ success:false, message:"Request origin verification failed." },403,headers);
   const url = new URL(request.url), path = url.pathname;
   try {
    if (path === "/health" && request.method === "GET") return json({ok:true,service:"prachi-nutrition-api",database:!!env.DB,authConfigured:!!(env.RESEND_API_KEY && env.MAIL_FROM),bootstrapConfigured:!!env.BOOTSTRAP_SECRET},200,headers);

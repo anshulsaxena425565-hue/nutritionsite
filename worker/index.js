@@ -15,7 +15,7 @@ function cors(request) {
 }
 const SESSION_TTL_SECONDS = 12 * 60 * 60;
 const SESSION_TTL_MS = SESSION_TTL_SECONDS * 1000;
-function cookie(name, value, maxAge) { return name+"="+value+"; Path=/; HttpOnly; Secure; SameSite=None; Partitioned; Max-Age="+maxAge; }
+function cookie(name, value, maxAge) { return name+"="+value+"; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age="+maxAge; }
 function createSessionCookie(raw) { return cookie("pn_session", raw, SESSION_TTL_SECONDS); }
 function clearSessionCookie() { return cookie("pn_session", "", 0); }
 function readSessionCookie(request) { return (request.headers.get("Cookie") || "").split(";").map(s => s.trim()).find(s => s.startsWith("pn_session="))?.slice("pn_session=".length) || ""; }

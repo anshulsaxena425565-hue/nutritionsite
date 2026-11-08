@@ -5,7 +5,7 @@ import{Activity,ArrowLeft,ArrowRight,BookOpen,Bookmark,Building2,CalendarClock,C
 import'./styles.css';
 import'./expired-plan-actions.css';
 import'./plan-modal-fix.css';
-const API='https://prachi-nutrition-api.prachisayani-api.workers.dev';
+const API='/api/worker';
 try{localStorage.removeItem('pn_session_token')}catch{}
 function Ico({name}){const icons={Scale,Flame,Utensils,Sprout,Activity,Droplet,Ruler,ChartNoAxesCombined,BookOpen,CookingPot,ArrowLeftRight,ClipboardList,ChartNoAxesColumnIncreasing,ChartPie,TrendingUp,BookOpenCheck,Pill,GlassWater,HeartPulse,CalendarClock,Gauge,ScanSearch,Waves,Baby,Droplets,FlaskConical,NotebookPen,ChartSpline,TestTube};const C=icons[name];return C?<C aria-hidden="true"/>:null}
 

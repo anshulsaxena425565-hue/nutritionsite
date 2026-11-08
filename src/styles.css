@@ -1223,3 +1223,14 @@ td b{color:#2e3a54}
 @media(max-width:560px){.patient-connection-card{align-items:flex-start;gap:11px;padding:15px}.patient-connection-icon{width:40px;height:40px;flex-basis:40px}.patient-connection-copy>b{font-size:14px}.patient-connection-card>button{padding:9px 11px;font-size:12px}}
 
 .care-connected-dietitian{margin-top:16px;margin-bottom:20px}
+
+
+/* Legal policy navigation */
+.auth-legal-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:24px;padding-top:16px;border-top:1px solid var(--line,#e7e8ee);color:var(--muted,#77808d);font-size:12px}
+.auth-legal-footer nav{display:flex;gap:16px;flex-wrap:wrap}
+.auth-legal-footer a,.profile-legal-links a{color:var(--brand-primary,var(--purple,#5a52d5));font-weight:650;text-decoration:none}
+.auth-legal-footer a:hover,.profile-legal-links a:hover{text-decoration:underline}
+.profile-legal-panel{grid-column:1/-1}
+.profile-legal-links{display:flex;gap:12px;flex-wrap:wrap}
+.profile-legal-links a{display:inline-flex;align-items:center;gap:8px;padding:11px 14px;border:1px solid var(--line,#e7e8ee);border-radius:12px;background:var(--surface,#fff)}
+@media(max-width:520px){.auth-legal-footer{align-items:flex-start;flex-direction:column}.auth-legal-footer nav{gap:12px}}

@@ -615,6 +615,9 @@ export default {
     await env.DB.prepare("INSERT INTO app_users(id,email,display_name,phone,status,account_type) VALUES(?,?,?,?,'invited','client')").bind(userId,email,name,phone).run();
     await env.DB.prepare("INSERT INTO practice_memberships(id,practice_id,user_id,role,status) VALUES(?,?,?,'client','invited')").bind(id(),practiceId,userId).run();
     await env.DB.prepare("INSERT INTO client_profiles(id,practice_id,user_id,assigned_dietitian_user_id,date_of_birth,preferred_name,onboarding_status) VALUES(?,?,?,?,?,?, 'incomplete')").bind(id(),practiceId,userId,session.user_id,dob||null,clean(b.preferred_name,120)||name).run();
+    // Create the private chat thread at the same time as the direct patient assignment.
+    const existingChat=await env.DB.prepare("SELECT id FROM conversations WHERE practice_id=? AND client_user_id=? AND dietitian_user_id=? AND status='open' LIMIT 1").bind(practiceId,userId,session.user_id).first();
+    if(!existingChat)await env.DB.prepare("INSERT INTO conversations(id,practice_id,client_user_id,dietitian_user_id,status) VALUES(?,?,?,?,'open')").bind(id(),practiceId,userId,session.user_id).run();
     await env.DB.prepare("INSERT INTO clinical_records(id,practice_id,client_user_id,dietitian_user_id,profile_json,patient_notes,status) VALUES(?,?,?,?,?,?,'draft')").bind(id(),practiceId,userId,session.user_id,JSON.stringify(safeProfile),clean(b.patient_notes,4000)).run();
     await env.DB.prepare("INSERT INTO practice_invitations(id,practice_id,email,role,invited_by_user_id,token_hash,expires_at) VALUES(?,?,?,'client',?,?,?)").bind(inviteId,practiceId,email,session.user_id,await hash(token),expires).run();
     const acceptUrl="https://prachisayani.online/portal.html#invite="+encodeURIComponent(token);
@@ -784,6 +787,23 @@ export default {
    if(path==="/dietitian/conversations"&&request.method==="GET") {
     if(!session)return json({success:false,message:"Sign in required."},401,headers);
     const practiceId=clean(url.searchParams.get("practice_id"),80),clientId=clean(url.searchParams.get("client_user_id"),80);
+    // Patient inbox: list every active connection assigned to this account, including patients added directly by their dietitian.
+    if(session.account_type==="client"){
+     const assigned=await env.DB.prepare("SELECT cp.practice_id,cp.assigned_dietitian_user_id FROM client_profiles cp JOIN practice_memberships pm ON pm.practice_id=cp.practice_id AND pm.user_id=cp.user_id WHERE cp.user_id=? AND pm.role='client' AND pm.status IN ('active','invited') AND cp.assigned_dietitian_user_id IS NOT NULL UNION SELECT r.practice_id,r.dietitian_user_id FROM dietitian_requests r WHERE r.client_user_id=? AND r.status='accepted'").bind(session.user_id,session.user_id).all();
+     for(const link of assigned.results||[]){
+      const existing=await env.DB.prepare("SELECT id FROM conversations WHERE practice_id=? AND client_user_id=? AND dietitian_user_id=? AND status='open' LIMIT 1").bind(link.practice_id,session.user_id,link.assigned_dietitian_user_id).first();
+      if(!existing)await env.DB.prepare("INSERT INTO conversations(id,practice_id,client_user_id,dietitian_user_id,status) VALUES(?,?,?,?,'open')").bind(id(),link.practice_id,session.user_id,link.assigned_dietitian_user_id).run();
+     }
+     const rows=await env.DB.prepare("SELECT c.id,c.practice_id,c.client_user_id,c.dietitian_user_id,c.status,c.updated_at,cu.display_name AS client_name,du.display_name AS dietitian_name FROM conversations c JOIN app_users cu ON cu.id=c.client_user_id LEFT JOIN app_users du ON du.id=c.dietitian_user_id WHERE c.client_user_id=? AND c.status='open' ORDER BY c.updated_at DESC LIMIT 100").bind(session.user_id).all();
+     return json({success:true,conversations:rows.results||[]},200,headers);
+    }
+    if(!practiceId)return json({success:false,message:"Practice is required."},400,headers);
+    // Backfill a thread for each directly assigned patient so older connections work too.
+    const assigned=await env.DB.prepare("SELECT user_id AS client_user_id,assigned_dietitian_user_id FROM client_profiles WHERE practice_id=? AND assigned_dietitian_user_id=?").bind(practiceId,session.user_id).all();
+    for(const link of assigned.results||[]){
+     const existing=await env.DB.prepare("SELECT id FROM conversations WHERE practice_id=? AND client_user_id=? AND dietitian_user_id=? AND status='open' LIMIT 1").bind(practiceId,link.client_user_id,session.user_id).first();
+     if(!existing)await env.DB.prepare("INSERT INTO conversations(id,practice_id,client_user_id,dietitian_user_id,status) VALUES(?,?,?,?,'open')").bind(id(),practiceId,link.client_user_id,session.user_id).run();
+    }
     const rows=await env.DB.prepare("SELECT c.id,c.practice_id,c.client_user_id,c.dietitian_user_id,c.status,c.updated_at,cu.display_name AS client_name,du.display_name AS dietitian_name FROM conversations c JOIN app_users cu ON cu.id=c.client_user_id LEFT JOIN app_users du ON du.id=c.dietitian_user_id WHERE c.practice_id=? AND (c.client_user_id=? OR c.dietitian_user_id=?) AND (?='' OR c.client_user_id=?) AND c.status='open' ORDER BY c.updated_at DESC LIMIT 100").bind(practiceId,session.user_id,session.user_id,clientId,clientId).all();
     return json({success:true,conversations:rows.results||[]},200,headers);
    }

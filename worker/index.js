@@ -75,10 +75,6 @@ async function establishSession(env,userId){
 async function getSession(request, env) {
   const raw = readSessionCookie(request);
   if (!raw) return null;
-async function getSession(request, env) {
-  const bearer = request.headers.get("Authorization") || "";
-  const raw = bearer.startsWith("Bearer ") ? bearer.slice(7).trim() : (request.headers.get("Cookie") || "").split(";").map(s => s.trim()).find(s => s.startsWith("pn_session="))?.slice("pn_session=".length);
-  if (!raw) return null;
   const row = await env.DB.prepare("SELECT s.id AS session_id,s.user_id,s.expires_at,u.email,u.display_name,u.status,u.account_type FROM auth_sessions s JOIN app_users u ON u.id=s.user_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>? AND u.status='active'").bind(await hash(raw), now()).first();
   if (!row) return null;
   const admin = await env.DB.prepare("SELECT status FROM platform_admins WHERE user_id=?").bind(row.user_id).first();
@@ -692,9 +688,9 @@ export default {
     await env.DB.prepare("UPDATE practice_memberships SET status='active' WHERE practice_id=? AND user_id=? AND role='client' AND status='invited'").bind(invite.practice_id,user.id).run();
     await env.DB.prepare("UPDATE practice_invitations SET status='accepted',accepted_at=? WHERE id=? AND status='pending'").bind(stamp,invite.id).run();
     await env.DB.prepare("UPDATE client_profiles SET onboarding_status='submitted' WHERE practice_id=? AND user_id=?").bind(invite.practice_id,user.id).run();
-    const established=await establishSession(env,user.id,headers);
+    const established=await establishSession(env,user.id);
     await audit(env,user.id,invite.practice_id,"patient.account_activated","patient",user.id);
-    return json({success:true,message:"Patient account activated.",session_token:established.token,user:{id:user.id,email:user.email,account_type:"client"}},200,established.headers);
+    return json({success:true,message:"Patient account activated.",user:{id:user.id,email:user.email,account_type:"client"}},200,{...headers,"Set-Cookie":established.setCookie});
    }
    if(path==="/dietitian/patients"&&request.method==="GET") {
     if(!session)return json({success:false,message:"Sign in required."},401,headers);

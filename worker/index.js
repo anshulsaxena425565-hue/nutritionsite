@@ -15,7 +15,7 @@ function cors(request) {
 }
 const SESSION_TTL_SECONDS = 12 * 60 * 60;
 const SESSION_TTL_MS = SESSION_TTL_SECONDS * 1000;
-function cookie(name, value, maxAge) { return name+"="+value+"; Path=/; HttpOnly; Secure; SameSite=None; Max-Age="+maxAge; }
+function cookie(name, value, maxAge) { return name+"="+value+"; Path=/; HttpOnly; Secure; SameSite=None; Partitioned; Max-Age="+maxAge; }
 function createSessionCookie(raw) { return cookie("pn_session", raw, SESSION_TTL_SECONDS); }
 function clearSessionCookie() { return cookie("pn_session", "", 0); }
 function readSessionCookie(request) { return (request.headers.get("Cookie") || "").split(";").map(s => s.trim()).find(s => s.startsWith("pn_session="))?.slice("pn_session=".length) || ""; }
@@ -165,7 +165,7 @@ export default {
     const challenge=await env.DB.prepare("SELECT * FROM auth_challenges WHERE email=? AND purpose='login' AND consumed_at IS NULL AND expires_at>? ORDER BY created_at DESC LIMIT 1").bind(email,now()).first();
     if(!challenge||challenge.attempts>=5) return json({success:false,message:"Invalid or expired code."},400,headers);
     const [salt,stored]=challenge.code_hash.split(":");
-    const valid=stored===await hash(salt+":"+code);
+    const valid=constantTimeHexEqual(stored,await hash(salt+":"+code));
     if(!valid){await env.DB.prepare("UPDATE auth_challenges SET attempts=attempts+1 WHERE id=? AND attempts<5").bind(challenge.id).run();return json({success:false,message:"Invalid or expired code."},400,headers);}
     const user=await env.DB.prepare("SELECT id FROM app_users WHERE email=? COLLATE NOCASE AND status='active'").bind(email).first();
     if(!user) return json({success:false,message:"Invalid or expired code."},400,headers);

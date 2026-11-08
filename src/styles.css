@@ -1202,3 +1202,10 @@ td b{color:#2e3a54}
 @media(prefers-reduced-motion:reduce){
  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+/* Patient dashboard: keep the primary care-hero action readable over the brand gradient. */
+.care-hero .hero-buttons .btn.light{
+  background:#fff!important;
+  color:#5149c4!important;
+  border-color:#fff!important;
+}

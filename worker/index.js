@@ -101,7 +101,7 @@ export default {
   const origin = request.headers.get("Origin");
   if (origin && !ORIGIN_ALLOWLIST.has(origin)) return json({ success:false, message:"Origin not allowed." },403);
   if (request.method === "OPTIONS") return new Response(null,{status:204,headers});
-  if (!["GET","HEAD"].includes(request.method) && (!origin || !ORIGIN_ALLOWLIST.has(origin) || request.headers.get("X-PN-CSRF") !== "1")) return json({ success:false, message:"Request origin verification failed." },403,headers);
+  if (!["GET","HEAD"].includes(request.method) && (!origin || !ORIGIN_ALLOWLIST.has(origin) || (new URL(request.url).pathname !== "/api/enquiry" && request.headers.get("X-PN-CSRF") !== "1"))) return json({ success:false, message:"Request origin verification failed." },403,headers);
   const url = new URL(request.url), path = url.pathname;
   try {
    if (path === "/health" && request.method === "GET") return json({ok:true,service:"prachi-nutrition-api",database:!!env.DB,authConfigured:!!(env.RESEND_API_KEY && env.MAIL_FROM),bootstrapConfigured:!!env.BOOTSTRAP_SECRET},200,headers);
@@ -159,7 +159,7 @@ export default {
    }
    if (path === "/auth/verify-code" && request.method === "POST") {
     const b=await body(request), email=clean(b.email,254).toLowerCase(), code=clean(b.code,6);
-    if(!emailOk(email)||!/^\\d{6}$/.test(code)) return json({success:false,message:"Invalid or expired code."},400,headers);
+    if(!emailOk(email)||!/^[0-9]{6}$/.test(code)) return json({success:false,message:"Invalid or expired code."},400,headers);
     if(!env.RATE_LIMIT_SECRET) return json({success:false,message:"Authentication protection is not configured. Please contact support."},503,headers);
     if(await isAuthRateLimited(env,request,"otp-verify",email,20,5,15*60*1000)) return json({success:false,message:"Invalid or expired code."},429,{...headers,"Retry-After":"900"});
     const challenge=await env.DB.prepare("SELECT * FROM auth_challenges WHERE email=? AND purpose='login' AND consumed_at IS NULL AND expires_at>? ORDER BY created_at DESC LIMIT 1").bind(email,now()).first();

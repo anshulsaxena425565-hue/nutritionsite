@@ -1209,3 +1209,15 @@ td b{color:#2e3a54}
   color:#5149c4!important;
   border-color:#fff!important;
 }
+
+
+/* Patient dashboard: visible connected dietitian card */
+.patient-connection-card{display:flex;align-items:center;gap:16px;margin:0 0 22px;padding:18px 22px;border:1px solid #dce7d9;border-radius:18px;background:linear-gradient(110deg,#f5f8f1 0%,#fffaf5 100%);box-shadow:0 8px 24px rgba(49,90,69,.06)}
+.patient-connection-icon{width:46px;height:46px;flex:0 0 46px;display:grid;place-items:center;border-radius:14px;background:#e3ecdf;color:#315a45}
+.patient-connection-copy{display:flex;flex:1;min-width:0;flex-direction:column;gap:3px}
+.patient-connection-copy>small{font-size:10px;font-weight:800;letter-spacing:.12em;color:#66816b}
+.patient-connection-copy>b{font-size:16px;color:#21352b;overflow-wrap:anywhere}
+.patient-connection-copy>span{font-size:12px;color:#718076}
+.patient-connection-card>button{display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:0 0 auto;border:0;border-radius:999px;padding:10px 16px;background:#315a45;color:#fff;font-weight:700;cursor:pointer}
+.patient-connection-card>button:hover{background:#244735}
+@media(max-width:560px){.patient-connection-card{align-items:flex-start;gap:11px;padding:15px}.patient-connection-icon{width:40px;height:40px;flex-basis:40px}.patient-connection-copy>b{font-size:14px}.patient-connection-card>button{padding:9px 11px;font-size:12px}}

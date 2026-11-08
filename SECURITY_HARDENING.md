@@ -21,7 +21,7 @@
 1. Merge the reviewed security branch only after CI is green.
 2. Deploy the updated Cloudflare Worker script, preserving its existing D1 and Resend bindings. The D1 migration and RATE_LIMIT_SECRET are already in place.
 3. Verify password login, OTP login, registration, patient activation, logout, 12-hour session expiry, CSRF rejection, rate-limit responses, and dashboard read/write flows on the production domain.
-4. Confirm document-level response headers on the Vercel edge. CSP meta policies cannot set HSTS, X-Frame-Options or Permissions-Policy; add those as Vercel response headers (or at the CDN edge) for all HTML routes.
+4. Verify the configured Vercel response headers (HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy and CSP) on production HTML and API routes with a header scan.
 
 ## Password-hashing rationale
 

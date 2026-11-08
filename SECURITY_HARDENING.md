@@ -1,28 +1,27 @@
 # Security hardening rollout
 
-## Required production configuration
+## Production configuration completed
 
-Before deploying the Worker revision, create a Cloudflare Worker secret named `RATE_LIMIT_SECRET` containing at least 32 cryptographically random bytes. Do not put the value in GitHub, source files, or client-side configuration.
-
-Apply `migrations/0010_auth_rate_limits.sql` to the production Cloudflare D1 database bound as `DB`. Authentication endpoints intentionally fail closed with HTTP 503 if the secret is absent.
+- Created the Cloudflare Worker secret RATE_LIMIT_SECRET (48 cryptographically random bytes); its value is not stored in this repository.
+- Applied the D1 migration creating auth_rate_limits and its expiry index to the production database bound as DB.
+- The Vercel project already has a same-origin rewrite from /api/worker/:path* to the Cloudflare Worker. The dashboard now calls /api/worker, so browser session cookies are first-party to prachisayani.online instead of third-party workers.dev cookies.
 
 ## Authentication changes
 
-- Browser sessions are stored only in an HttpOnly, Secure, SameSite=None cookie scoped to the API host. The frontend sends cookies and an allowlisted custom CSRF header. Bearer tokens and JSON session-token responses are no longer accepted.
+- Browser sessions are stored only in an HttpOnly, Secure, SameSite=Lax cookie. The frontend sends cookies with same-origin requests and an allowlisted custom CSRF header. Bearer tokens and JSON session-token responses are no longer accepted.
 - Session absolute lifetime is 12 hours. Existing bearer-token sessions require a fresh sign-in after rollout.
 - Existing PBKDF2-SHA256 hashes at 100,000 iterations are verified once and upgraded to the versioned 600,000-iteration format after successful password login.
-- Login, registration, OTP issue and OTP verification are throttled by IP and account/email using HMAC-pseudonymised D1 bucket keys.
-- OTP consumption is atomic to prevent parallel replay.
-- API JSON responses include CSP, HSTS, frame, MIME-sniffing, referrer, permissions and opener protections.
+- Login, registration, OTP issue and OTP verification are throttled by IP and account/email using HMAC-pseudonymised D1 bucket keys. Expired buckets are cleaned during auth requests.
+- OTP consumption is conditional/atomic and digest comparisons use a constant-time comparison helper.
+- API responses, including CORS preflight, include CSP, HSTS, frame, MIME-sniffing, referrer, permissions and opener protections.
+- Static HTML pages include CSP and referrer meta policies. The landing page inline JavaScript was moved to a same-origin asset so the page can use script-src 'self'.
 
 ## Deployment sequence
 
-1. Set the Worker secret `RATE_LIMIT_SECRET`.
-2. Apply migration 0010 to the production Cloudflare D1 database.
-3. Deploy `worker/index.js` to the existing Worker, preserving its D1 and Resend bindings.
-4. Merge the frontend and workflow changes only after CI passes.
-5. Verify password login, OTP login, registration, logout, 12-hour session expiry, CSRF rejection, rate-limit responses, and dashboard read/write flows.
-6. Confirm document response headers on the production dashboard. The portal now has a CSP meta policy; HSTS, X-Frame-Options and Permissions-Policy for the HTML document must also be enforced at the hosting/Cloudflare edge because meta policies cannot set every response header.
+1. Merge the reviewed security branch only after CI is green.
+2. Deploy the updated Cloudflare Worker script, preserving its existing D1 and Resend bindings. The D1 migration and RATE_LIMIT_SECRET are already in place.
+3. Verify password login, OTP login, registration, patient activation, logout, 12-hour session expiry, CSRF rejection, rate-limit responses, and dashboard read/write flows on the production domain.
+4. Confirm document-level response headers on the Vercel edge. CSP meta policies cannot set HSTS, X-Frame-Options or Permissions-Policy; add those as Vercel response headers (or at the CDN edge) for all HTML routes.
 
 ## Password-hashing rationale
 

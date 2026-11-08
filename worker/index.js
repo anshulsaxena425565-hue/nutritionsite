@@ -738,6 +738,12 @@ export default {
     await env.DB.prepare("DELETE FROM patient_food_diary WHERE id=? AND client_user_id=?").bind(existing.id,session.user_id).run();
     return json({success:true,message:"Food diary entry deleted."},200,headers);
    }
+   if(path==="/client/connection"&&request.method==="GET") {
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    if(session.account_type!=="client")return json({success:false,message:"Patient access required."},403,headers);
+    const rows=await env.DB.prepare("SELECT cp.practice_id,cp.assigned_dietitian_user_id AS dietitian_user_id,du.display_name AS dietitian_name,du.email AS dietitian_email,p.name AS practice_name,dp.profile_photo_data_url AS dietitian_photo,'assigned' AS connection_type FROM client_profiles cp JOIN app_users du ON du.id=cp.assigned_dietitian_user_id LEFT JOIN practices p ON p.id=cp.practice_id LEFT JOIN dietitian_profiles dp ON dp.user_id=du.id WHERE cp.user_id=? AND cp.assigned_dietitian_user_id IS NOT NULL UNION SELECT r.practice_id,r.dietitian_user_id,du.display_name AS dietitian_name,du.email AS dietitian_email,p.name AS practice_name,dp.profile_photo_data_url AS dietitian_photo,'accepted' AS connection_type FROM dietitian_requests r JOIN app_users du ON du.id=r.dietitian_user_id LEFT JOIN practices p ON p.id=r.practice_id LEFT JOIN dietitian_profiles dp ON dp.user_id=du.id WHERE r.client_user_id=? AND r.status='accepted' ORDER BY practice_name,dietitian_name").bind(session.user_id,session.user_id).all();
+    return json({success:true,connections:rows.results||[]},200,headers);
+   }
    if(path==="/client/diet-plans"&&request.method==="GET") {
     if(!session)return json({success:false,message:"Sign in required."},401,headers);
     const practiceId=clean(url.searchParams.get("practice_id"),80);

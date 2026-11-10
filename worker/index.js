@@ -663,7 +663,7 @@ export default {
    if(path==="/client/tasks"&&request.method==="GET"){
     if(!session)return json({success:false,message:"Sign in required."},401,headers);
     if(session.account_type!=="client")return json({success:false,message:"Client account required."},403,headers);
-    const rows=await env.DB.prepare("SELECT t.id,t.title,t.description,t.due_at,t.status,t.created_at,t.updated_at,t.completed_at,u.display_name AS dietitian_name FROM patient_tasks t LEFT JOIN app_users u ON u.id=t.dietitian_user_id WHERE t.client_user_id=? ORDER BY CASE WHEN t.status='completed' THEN 1 ELSE 0 END,t.due_at IS NULL,t.due_at ASC,t.created_at DESC LIMIT 300").bind(session.user_id).all();
+    const rows=await env.DB.prepare("SELECT t.id,t.title,t.description,t.due_at,t.status,t.recurrence_type,t.recurrence_days,t.series_id,t.created_at,t.updated_at,t.completed_at,u.display_name AS dietitian_name FROM patient_tasks t LEFT JOIN app_users u ON u.id=t.dietitian_user_id WHERE t.client_user_id=? ORDER BY CASE WHEN t.status='completed' THEN 1 ELSE 0 END,t.due_at IS NULL,t.due_at ASC,t.created_at DESC LIMIT 300").bind(session.user_id).all();
     return json({success:true,tasks:rows.results||[]},200,headers);
    }
    const clientTaskId=path.startsWith("/client/tasks/")?clean(path.slice("/client/tasks/".length),80):"";
@@ -672,12 +672,19 @@ export default {
     if(session.account_type!=="client")return json({success:false,message:"Client account required."},403,headers);
     const b=await body(request),status=clean(b.status,20);
     if(!["pending","in_progress","completed"].includes(status))return json({success:false,message:"Choose To do, In progress or Done."},400,headers);
-    const task=await env.DB.prepare("SELECT id,practice_id FROM patient_tasks WHERE id=? AND client_user_id=?").bind(clientTaskId,session.user_id).first();
+    const task=await env.DB.prepare("SELECT id,practice_id,title,description,due_at,status,recurrence_type,recurrence_days,series_id,dietitian_user_id FROM patient_tasks WHERE id=? AND client_user_id=?").bind(clientTaskId,session.user_id).first();
     if(!task)return json({success:false,message:"Task not found for this patient."},404,headers);
     const stamp=now(),completedAt=status==="completed"?stamp:null;
     await env.DB.prepare("UPDATE patient_tasks SET status=?,updated_at=?,completed_at=? WHERE id=? AND client_user_id=?").bind(status,stamp,completedAt,task.id,session.user_id).run();
+    let nextTask=null;
+    if(status==='completed'&&task.status!=='completed'&&task.recurrence_type&&task.recurrence_type!=='once'&&task.due_at){
+     const nextDue=new Date(task.due_at);
+     if(task.recurrence_type==='daily')nextDue.setUTCDate(nextDue.getUTCDate()+1);
+     else{const days=(task.recurrence_days||'').split(',').map(Number).filter(x=>Number.isInteger(x)&&x>=0&&x<=6);let offset=0;for(let i=1;i<=7;i++){const candidate=new Date(nextDue);candidate.setUTCDate(candidate.getUTCDate()+i);if(days.includes(candidate.getUTCDay())){offset=i;break}}if(offset)nextDue.setUTCDate(nextDue.getUTCDate()+offset)}
+     if(Number.isFinite(nextDue.getTime())&&nextDue>new Date(task.due_at)){const nextId=id(),seriesId=task.series_id||task.id,nextIso=nextDue.toISOString();await env.DB.prepare("INSERT INTO patient_tasks(id,practice_id,dietitian_user_id,client_user_id,title,description,due_at,status,recurrence_type,recurrence_days,series_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'pending',?,?,?,?,?)").bind(nextId,task.practice_id,task.dietitian_user_id,session.user_id,task.title,task.description,nextIso,task.recurrence_type,task.recurrence_days||'',seriesId,stamp,stamp).run();nextTask={id:nextId,due_at:nextIso,title:task.title}}
+    }
     await audit(env,session.user_id,task.practice_id,"patient_task.status_updated","patient_task",task.id,{status});
-    return json({success:true,message:"Task status updated.",status,updated_at:stamp,completed_at:completedAt},200,headers);
+    return json({success:true,message:nextTask?"Task completed. The next scheduled reminder has been created.":"Task status updated.",status,updated_at:stamp,completed_at:completedAt,next_task:nextTask},200,headers);
    }
    // Shared account-level measurements: the client tracker and connected care team
    // read and write the same records. Client identity is taken from the session.
@@ -868,13 +875,17 @@ export default {
      const rows=await env.DB.prepare("SELECT t.id,t.title,t.description,t.due_at,t.status,t.created_at,t.updated_at,t.completed_at,u.display_name AS dietitian_name FROM patient_tasks t LEFT JOIN app_users u ON u.id=t.dietitian_user_id WHERE t.practice_id=? AND t.client_user_id=? AND t.dietitian_user_id=? ORDER BY CASE WHEN t.status='completed' THEN 1 ELSE 0 END,t.due_at IS NULL,t.due_at ASC,t.created_at DESC LIMIT 300").bind(practiceId,clientId,session.user_id).all();
      return json({success:true,tasks:rows.results||[]},200,headers);
     }
-    const title=clean(b.title,120),description=clean(b.description,1000),dueAt=b.due_at?new Date(b.due_at):null;
+    const title=clean(b.title,120),description=clean(b.description,1000),dueAt=b.due_at?new Date(b.due_at):null,recurrenceType=clean(b.recurrence_type,12)||'once',recurrenceDays=Array.isArray(b.recurrence_days)?[...new Set(b.recurrence_days.map(Number).filter(x=>Number.isInteger(x)&&x>=0&&x<=6))].sort().join(','):'';
     if(!title)return json({success:false,message:"A task title is required."},400,headers);
     if(b.due_at&&(!dueAt||!Number.isFinite(dueAt.getTime())))return json({success:false,message:"Enter a valid due date and time."},400,headers);
+    if(!['once','daily','weekly'].includes(recurrenceType))return json({success:false,message:'Choose a valid repeat schedule.'},400,headers);
+    if(recurrenceType!=='once'&&!dueAt)return json({success:false,message:'A due date and time are required for repeating tasks.'},400,headers);
+    if(recurrenceType==='weekly'&&!recurrenceDays)return json({success:false,message:'Choose at least one weekday for a weekly task.'},400,headers);
     const taskId=id(),stamp=now(),dueIso=dueAt?dueAt.toISOString():null;
-    await env.DB.prepare("INSERT INTO patient_tasks(id,practice_id,dietitian_user_id,client_user_id,title,description,due_at,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'pending',?,?)").bind(taskId,practiceId,session.user_id,clientId,title,description,dueIso,stamp,stamp).run();
-    await audit(env,session.user_id,practiceId,"patient_task.created","patient_task",taskId,{client_user_id:clientId,title,due_at:dueIso});
-    return json({success:true,message:"Task assigned to the patient.",task:{id:taskId,title,description,due_at:dueIso,status:"pending",created_at:stamp,updated_at:stamp}},201,headers);
+    const seriesId=recurrenceType==='once'?null:id();
+    await env.DB.prepare("INSERT INTO patient_tasks(id,practice_id,dietitian_user_id,client_user_id,title,description,due_at,status,recurrence_type,recurrence_days,series_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'pending',?,?,?,?,?)").bind(taskId,practiceId,session.user_id,clientId,title,description,dueIso,recurrenceType,recurrenceDays,seriesId,stamp,stamp).run();
+    await audit(env,session.user_id,practiceId,"patient_task.created","patient_task",taskId,{client_user_id:clientId,title,due_at:dueIso,recurrence_type:recurrenceType,recurrence_days:recurrenceDays});
+    return json({success:true,message:"Task assigned to the patient.",task:{id:taskId,title,description,due_at:dueIso,status:"pending",recurrence_type:recurrenceType,recurrence_days:recurrenceDays,series_id:seriesId,created_at:stamp,updated_at:stamp}},201,headers);
    }
    // Dietitian access is restricted to a connected patient in the selected practice.
    if(path==="/dietitian/patient-measurements"&&(request.method==="GET"||request.method==="POST")){

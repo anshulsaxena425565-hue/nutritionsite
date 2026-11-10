@@ -1248,3 +1248,15 @@ td b{color:#2e3a54}
 .patient-task-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}.patient-task-actions select{min-height:38px;border:1px solid var(--border,#dfe2ee);border-radius:10px;padding:6px 9px;background:var(--surface,#fff);max-width:130px}
 .patient-task-item.is-complete{opacity:.76}.patient-task-empty{display:grid;justify-items:center;text-align:center;gap:7px;padding:25px 12px;color:var(--muted,#68708a)}.patient-task-empty b{color:var(--text,#20243a)}.patient-task-empty p{margin:0;font-size:13px}
 @media(max-width:640px){.patient-task-reminders{padding:15px;margin:14px 0;border-radius:16px}.patient-task-heading{gap:8px}.patient-task-heading h3{font-size:17px}.patient-task-item{align-items:flex-start;flex-direction:column;gap:10px;padding:12px}.patient-task-actions{width:100%;justify-content:space-between}.patient-task-actions select{flex:1;max-width:none;min-height:42px}.patient-task-copy b{font-size:14px}}
+
+.diet-macro-split{margin:14px 0 16px;padding:14px;border:1px solid #e4e6f3;border-radius:12px;background:#fbfbff}
+.diet-macro-split-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.diet-macro-split-head>div{display:grid;gap:3px}.diet-macro-split-head b{font-size:13px;color:#303858}.diet-macro-split-head small,.diet-macro-split-total{font-size:12px;color:#7b8296}
+.diet-macro-split-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.diet-macro-split-fields .field input{width:100%;min-width:0}
+.diet-macro-split-total{margin:10px 0 0}.diet-macro-split-total b{color:#4d479e}
+.diet-calculation-explainer{margin:12px 0 18px;padding:14px 15px;border:1px solid #dfe7f5;border-left:4px solid #625bd0;border-radius:11px;background:#f7f9ff;color:#4d5872}
+.diet-calculation-explainer>div{display:flex;align-items:center;gap:8px;color:#343b78;font-size:13px}
+.diet-calculation-explainer p{margin:8px 0 5px;font-size:12px;line-height:1.7;white-space:normal}
+.diet-calculation-explainer small{display:block;color:#7a8297;font-size:11px;line-height:1.5}
+@media(max-width:560px){.diet-macro-split-fields{grid-template-columns:1fr}.diet-macro-split-head{align-items:flex-start}}

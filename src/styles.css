@@ -1366,3 +1366,36 @@ td b{color:#2e3a54}
 .dfa-launcher{padding:18px 20px}.dfa-launch-actions{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:15px;padding-top:13px;border-top:1px solid #e9ebf3}.dfa-launch-actions>div{display:grid;gap:3px}.dfa-launch-actions strong{font-size:12px;color:#303a68}.dfa-launch-actions small{font-size:10px;color:#9299ac}
 .dfa-modal-backdrop{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(20,25,52,.52);backdrop-filter:blur(5px)}.dfa-modal{display:flex;flex-direction:column;width:min(920px,100%);max-height:min(88vh,900px);overflow:hidden;border:1px solid rgba(255,255,255,.7);border-radius:22px;background:#fbfcff;box-shadow:0 28px 90px rgba(12,17,48,.28)}.dfa-modal-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:22px 24px 15px;background:linear-gradient(115deg,#f0efff,#f8faff 65%,#eef9f4);border-bottom:1px solid #eaedf5}.dfa-modal-header h3{margin:5px 0;color:#252d55;font-size:21px;letter-spacing:-.5px}.dfa-modal-header p{margin:0;color:#828aa1;font-size:11px}.dfa-modal-close{display:grid;place-items:center;width:36px;height:36px;flex:0 0 36px;border:1px solid #e4e6f1;border-radius:11px;background:#fff;color:#59617e;cursor:pointer}.dfa-nutrient-tabs{display:flex;gap:7px;padding:14px 24px 10px;overflow-x:auto}.dfa-nutrient-tabs button{min-width:78px;padding:9px 14px;border:1px solid #e5e8f2;border-radius:10px;background:#fff;color:#6d7690;font-size:11px;font-weight:750;cursor:pointer}.dfa-nutrient-tabs button.active{border-color:#645bd0;background:#efeeff;color:#4e47ad;box-shadow:0 0 0 2px rgba(95,85,205,.08)}.dfa-modal-controls{display:grid;grid-template-columns:1.4fr 1fr;gap:12px;padding:5px 24px 14px}.dfa-modal-controls label{display:grid;gap:6px;color:#58627e;font-size:10px;font-weight:750}.dfa-modal-controls input,.dfa-modal-controls select{width:100%;min-height:39px;padding:9px 11px;border:1px solid #e1e5f0;border-radius:10px;background:white;color:#303953;font:inherit}.dfa-modal-food-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:0 24px 16px;overflow:auto;overscroll-behavior:contain}.dfa-modal-food-card{min-width:0;padding:13px;border:1px solid #e7eaf3;border-radius:14px;background:white}.dfa-modal-food-title{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.dfa-modal-food-title>div>span{color:#858da5;font-size:9px;font-weight:750}.dfa-modal-food-title h4{margin:4px 0 0;color:#2e3757;font-size:13px;line-height:1.4}.dfa-modal-food-title>strong{white-space:nowrap;color:#27805b;font-size:18px}.dfa-modal-food-title>strong small{display:block;color:#8992a7;font-size:9px;font-weight:650;text-align:right}.dfa-modal-nutrients{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0}.dfa-modal-nutrients span{padding:5px 7px;border-radius:7px;background:#f5f6fa;color:#69738c;font-size:9px;font-weight:650}.dfa-modal-add{display:flex;align-items:flex-end;justify-content:space-between;gap:9px;padding-top:10px;border-top:1px solid #eff0f5}.dfa-portion-picker{display:grid;gap:6px;min-width:0}.dfa-portion-picker>label{font-size:10px;font-weight:750;color:#5e6882}.dfa-portion-presets{display:flex;gap:4px;flex-wrap:wrap}.dfa-portion-presets button{padding:5px 7px;border:1px solid #e5e8f0;border-radius:7px;background:#fff;color:#69738c;font-size:9px;cursor:pointer}.dfa-portion-presets button.selected{border-color:#625acc;background:#f0efff;color:#4d46a7}.dfa-portion-picker>input{width:85px;min-height:30px;padding:5px 8px;border:1px solid #e1e5f0;border-radius:8px;color:#35405d;font-size:11px}.dfa-modal-add>button{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:36px;padding:8px 11px;border:0;border-radius:9px;background:#514bb2;color:white;font-size:10px;font-weight:800;white-space:nowrap;cursor:pointer}.dfa-modal-footer{padding:12px 24px;border-top:1px solid #eaedf4;background:#f7f8fc;color:#838ca2;font-size:10px;line-height:1.55}
 @media(max-width:650px){.dfa-launcher{padding:15px}.dfa-launch-actions{align-items:stretch;flex-direction:column}.dfa-launch-actions .diet-food-lookup-button{justify-content:center;width:100%}.dfa-modal-backdrop{padding:8px;align-items:flex-end}.dfa-modal{max-height:94vh;border-radius:19px 19px 12px 12px}.dfa-modal-header{padding:17px 16px 12px}.dfa-modal-header h3{font-size:18px}.dfa-nutrient-tabs{padding:12px 16px 9px}.dfa-nutrient-tabs button{min-width:68px;padding:8px 10px}.dfa-modal-controls{grid-template-columns:1fr;padding:5px 16px 12px;gap:8px}.dfa-modal-food-grid{grid-template-columns:1fr;padding:0 16px 13px}.dfa-modal-footer{padding:10px 16px;font-size:9px}.dfa-modal-add{align-items:flex-end}.dfa-portion-presets button{padding:5px 6px}}
+
+
+/* IFCT food finder: keep nutrient tabs visible and prevent flex overflow/overlap */
+.dfa-modal{min-height:0}
+.dfa-modal-header{flex:0 0 auto}
+.dfa-nutrient-tabs{
+  position:relative;z-index:2;display:flex;flex:0 0 auto;align-items:center;
+  min-height:58px;gap:8px;padding:10px 24px;
+  overflow-x:auto;overflow-y:hidden;white-space:nowrap;
+  background:#fbfcff;box-sizing:border-box;scrollbar-width:none;
+  overscroll-behavior-x:contain;
+}
+.dfa-nutrient-tabs::-webkit-scrollbar{display:none}
+.dfa-nutrient-tabs button{
+  display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;
+  min-width:88px;min-height:38px;padding:0 16px;margin:0;
+  border:1px solid #e3e7f1;border-radius:10px;background:#fff;
+  color:#64708a;font-size:12px;font-weight:700;line-height:1.2;
+  box-shadow:none;white-space:nowrap;transition:background .16s ease,border-color .16s ease,color .16s ease;
+}
+.dfa-nutrient-tabs button:hover{border-color:#b9b5ef;background:#f7f6ff;color:#4f49ad}
+.dfa-nutrient-tabs button.active{
+  border-color:#5c55c7;background:#eeedff;color:#4943a8;
+  box-shadow:inset 0 0 0 1px rgba(92,85,199,.12);
+}
+.dfa-nutrient-tabs button:focus-visible{outline:3px solid rgba(92,85,199,.22);outline-offset:2px}
+.dfa-modal-controls{position:relative;z-index:1;flex:0 0 auto;min-width:0}
+.dfa-modal-food-grid{flex:1 1 auto;min-height:0;min-width:0;align-content:start}
+.dfa-modal-footer{flex:0 0 auto}
+@media(max-width:650px){
+ .dfa-nutrient-tabs{min-height:54px;padding:8px 16px;gap:7px}
+ .dfa-nutrient-tabs button{min-width:78px;min-height:36px;padding:0 12px}
+}

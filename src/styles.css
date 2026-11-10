@@ -1260,3 +1260,87 @@ td b{color:#2e3a54}
 .diet-calculation-explainer p{margin:8px 0 5px;font-size:12px;line-height:1.7;white-space:normal}
 .diet-calculation-explainer small{display:block;color:#7a8297;font-size:11px;line-height:1.5}
 @media(max-width:560px){.diet-macro-split-fields{grid-template-columns:1fr}.diet-macro-split-head{align-items:flex-start}}
+
+
+/* Patient dashboard refresh · warm, encouraging and mobile-first */
+.patient-home{gap:18px;max-width:1180px;margin:0 auto}
+.patient-welcome{position:relative;isolation:isolate;overflow:hidden;min-height:238px;align-items:center;padding:30px 34px;border:1px solid #e4e4fb;border-radius:26px;background:linear-gradient(112deg,#f0efff 0%,#f8f8ff 52%,#eaf8f2 100%);box-shadow:0 12px 34px rgba(47,49,112,.055)}
+.patient-welcome:before,.patient-welcome:after{content:"";position:absolute;z-index:-1;border:1px solid rgba(104,100,196,.12);border-radius:50%;pointer-events:none}
+.patient-welcome:before{width:310px;height:310px;right:95px;top:-195px;box-shadow:0 0 0 28px rgba(255,255,255,.16),0 0 0 58px rgba(255,255,255,.12)}
+.patient-welcome:after{width:190px;height:190px;right:-90px;bottom:-120px;background:rgba(255,255,255,.2)}
+.patient-welcome-copy{position:relative;z-index:1;max-width:600px}
+.patient-welcome h2{font-size:clamp(30px,3.7vw,43px);line-height:1.04;letter-spacing:-1.6px;margin:13px 0 9px;color:#20234f}
+.patient-welcome h2 em{font-style:normal;color:#6861c8}
+.patient-welcome p{font-size:14px;line-height:1.65;max-width:410px}
+.patient-welcome-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:20px}
+.patient-welcome-actions button{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:12px;padding:11px 14px;background:#5550b7;color:white;font-size:12px;font-weight:800;box-shadow:0 6px 15px rgba(85,80,183,.17);transition:transform .18s ease,box-shadow .18s ease}
+.patient-welcome-actions button:hover{transform:translateY(-2px);box-shadow:0 9px 20px rgba(85,80,183,.2)}
+.patient-welcome-actions .patient-welcome-secondary{background:rgba(255,255,255,.8);color:#5550a8;border:1px solid #e5e3fa;box-shadow:none}
+.patient-welcome-side{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:7px;min-width:210px}
+.patient-welcome-date{display:flex;align-items:center;gap:7px;padding:8px 12px;border:1px solid rgba(255,255,255,.9);border-radius:99px;background:rgba(255,255,255,.72);color:#555b83;font-size:11px;font-weight:750}
+.patient-welcome-side>small{font-size:9px;letter-spacing:1.3px;color:#7779a2;font-weight:800}
+.patient-welcome-orbit{position:relative;display:grid;place-items:center;width:142px;height:128px}
+.patient-orbit-ring{position:absolute;width:116px;height:116px;border:1px dashed rgba(99,94,185,.32);border-radius:50%;transform:rotate(-20deg) scaleX(1.2)}
+.patient-orbit-core{display:grid;place-items:center;width:76px;height:76px;border-radius:25px;background:linear-gradient(145deg,#fff 0%,#e9e8ff 100%);color:#615ac2;box-shadow:0 12px 26px rgba(67,65,143,.15);transform:rotate(-7deg)}
+.patient-orbit-spark{position:absolute;display:grid;place-items:center;width:32px;height:32px;border-radius:11px;background:#fff;color:#6d66ca;box-shadow:0 5px 14px rgba(50,50,100,.1);font-style:normal}
+.patient-orbit-spark.spark-one{top:5px;right:8px}.patient-orbit-spark.spark-two{bottom:8px;left:9px;color:#3e9a7b}
+.patient-day-pulse{padding:19px 21px;border:1px solid #ececf5;border-radius:20px;background:#fff;box-shadow:0 7px 24px rgba(37,43,88,.035)}
+.patient-pulse-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.patient-pulse-heading h3{margin:4px 0 0;font-size:17px;letter-spacing:-.35px;color:#272c50}
+.patient-pulse-note{font-size:11px;color:#9295ac}
+.patient-pulse-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.patient-pulse-item{display:flex;align-items:center;gap:10px;min-width:0;padding:12px;border:1px solid #f0f0f6;border-radius:14px;background:#fbfbfe}
+.pulse-icon{display:grid;place-items:center;flex:0 0 36px;width:36px;height:36px;border-radius:12px}
+.pulse-food{background:#f0efff;color:#655dc8}.pulse-water{background:#e9f6ff;color:#398bc5}.pulse-task{background:#eaf7f0;color:#38966d}
+.patient-pulse-item>div{display:grid;min-width:0;gap:2px}
+.patient-pulse-item>div b{font-size:18px;line-height:1.1;color:#282e52}
+.patient-pulse-item>div small{font-size:10px;color:#898fa6;white-space:nowrap}
+.patient-pulse-status{margin-left:auto;font-size:10px;font-weight:750;color:#747ba0;text-align:right;white-space:nowrap}
+.patient-connection-card{border-radius:17px!important;box-shadow:0 5px 18px rgba(36,49,90,.035)}
+.patient-task-reminders{border-radius:20px!important;box-shadow:0 7px 22px rgba(37,43,88,.035)}
+.patient-quick-card{min-height:156px;border-radius:19px;transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
+.patient-quick-card:hover{transform:translateY(-3px);box-shadow:0 12px 25px rgba(35,43,95,.08);border-color:#dcdaf8}
+.patient-quick-card.food>span{background:#f1efff;color:#655dc8}
+.patient-home .panel{border-radius:19px;box-shadow:0 7px 22px rgba(37,43,88,.035)}
+.patient-home .panel-head h3{letter-spacing:-.25px}
+.patient-privacy-note{padding:3px 2px 0}
+@media(max-width:900px){.patient-welcome{min-height:210px}.patient-welcome-side{min-width:160px}.patient-welcome-orbit{transform:scale(.86)}}
+@media(max-width:600px){
+ .patient-home{gap:12px;padding-bottom:94px}
+ .patient-welcome{display:flex;align-items:center;gap:4px;min-height:0;padding:20px 17px;border-radius:20px}
+ .patient-welcome-copy{min-width:0;flex:1}
+ .patient-welcome h2{font-size:29px;line-height:1.03;letter-spacing:-1.1px;margin:10px 0 7px}
+ .patient-welcome p{font-size:11px;line-height:1.5;max-width:255px}
+ .patient-welcome-actions{gap:7px;margin-top:14px}
+ .patient-welcome-actions button{padding:10px 10px;font-size:10px;gap:6px;border-radius:10px}
+ .patient-welcome-actions button svg{width:13px;height:13px}
+ .patient-welcome-side{min-width:82px;gap:1px;align-self:stretch;justify-content:center}
+ .patient-welcome-date{position:absolute;top:0;right:0;padding:6px 8px;font-size:9px;gap:4px}
+ .patient-welcome-date svg{width:12px;height:12px}
+ .patient-welcome-orbit{width:86px;height:98px;transform:scale(.72);margin-top:15px}
+ .patient-welcome-side>small{font-size:7px;letter-spacing:.5px;white-space:nowrap}
+ .patient-day-pulse{padding:14px 12px;border-radius:16px}
+ .patient-pulse-heading{margin-bottom:10px}
+ .patient-pulse-heading h3{font-size:15px}
+ .patient-pulse-note{font-size:9px}
+ .patient-pulse-grid{gap:6px}
+ .patient-pulse-item{display:grid;grid-template-columns:30px minmax(0,1fr);gap:7px;padding:9px 7px;border-radius:12px}
+ .pulse-icon{width:30px;height:30px;flex-basis:30px;border-radius:10px}
+ .pulse-icon svg{width:15px;height:15px}
+ .patient-pulse-item>div b{font-size:15px}
+ .patient-pulse-item>div small{font-size:9px;white-space:normal;line-height:1.2}
+ .patient-pulse-status{grid-column:1/-1;margin:0;text-align:left;font-size:9px}
+ .patient-connection-card{padding:12px!important;gap:9px}
+ .patient-connection-copy b{font-size:12px}
+ .patient-task-reminders{padding:14px!important}
+ .patient-task-heading{gap:8px}
+ .patient-task-heading h3{font-size:15px}
+ .patient-quick-card{min-height:136px;padding:12px;border-radius:15px}
+ .patient-quick-card>span{width:34px;height:34px}
+ .patient-home-columns{gap:10px}
+ .patient-home .panel{padding:14px;border-radius:16px}
+ .patient-today-list>div{grid-template-columns:32px minmax(0,1fr);gap:8px}
+ .patient-today-list>div>small{grid-column:2}
+ .patient-mobile-nav{box-shadow:0 9px 30px rgba(30,35,83,.18)}
+}
+@media(prefers-reduced-motion:reduce){.patient-welcome-actions button,.patient-quick-card{transition:none}}

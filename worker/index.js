@@ -665,15 +665,15 @@ export default {
     if(!session)return json({success:false,message:"Sign in required."},401,headers);
     if(session.account_type!=="client")return json({success:false,message:"Client account required."},403,headers);
     if(request.method==="GET"){
-     const rows=await env.DB.prepare("SELECT m.id,m.measurement_date AS date,m.weight_kg AS weight,m.height_cm AS height,m.bmi,m.recorded_by_role,m.note,m.created_at,u.display_name AS recorded_by_name FROM patient_measurements m LEFT JOIN app_users u ON u.id=m.recorded_by_user_id WHERE m.client_user_id=? ORDER BY m.measurement_date DESC,m.created_at DESC LIMIT 500").bind(session.user_id).all();
+     const rows=await env.DB.prepare("SELECT m.id,m.measurement_date AS date,m.measurement_time AS time,m.weight_kg AS weight,m.height_cm AS height,m.bmi,m.recorded_by_role,m.note,m.created_at,u.display_name AS recorded_by_name FROM patient_measurements m LEFT JOIN app_users u ON u.id=m.recorded_by_user_id WHERE m.client_user_id=? ORDER BY m.measurement_date DESC,m.measurement_time DESC,m.created_at DESC LIMIT 500").bind(session.user_id).all();
      return json({success:true,measurements:rows.results||[]},200,headers);
     }
-    const b=await body(request),date=clean(b.date,10),weight=Number(b.weight),height=Number(b.height);
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+"T12:00:00Z"))||!(weight>0&&weight<500&&height>=50&&height<260))return json({success:false,message:"Enter a valid measurement date, weight and height."},400,headers);
+    const b=await body(request),date=clean(b.date,10),time=clean(b.time,5)||"00:00",weight=Number(b.weight),height=Number(b.height);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+"T12:00:00Z"))||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)||!(weight>0&&weight<500&&height>=50&&height<260))return json({success:false,message:"Enter a valid measurement date, time, weight and height."},400,headers);
     const measurementId=clean(b.id,80)||id(),bmi=Number((weight/((height/100)**2)).toFixed(1)),stamp=now();
-    await env.DB.prepare("INSERT INTO patient_measurements(id,client_user_id,measurement_date,weight_kg,height_cm,bmi,recorded_by_user_id,recorded_by_role,note,created_at) VALUES(?,?,?,?,?,?,?,'client',?,?) ON CONFLICT(id) DO NOTHING").bind(measurementId,session.user_id,date,weight,height,bmi,session.user_id,clean(b.note,500),stamp).run();
+    await env.DB.prepare("INSERT INTO patient_measurements(id,client_user_id,measurement_date,measurement_time,weight_kg,height_cm,bmi,recorded_by_user_id,recorded_by_role,note,created_at) VALUES(?,?,?,?,?,?,?,?, 'client',?,?) ON CONFLICT(id) DO NOTHING").bind(measurementId,session.user_id,date,time,weight,height,bmi,session.user_id,clean(b.note,500),stamp).run();
     await audit(env,session.user_id,null,"patient_measurement.created","patient_measurement",measurementId,{measurement_date:date,source:"client"});
-    return json({success:true,message:"Measurement saved securely.",measurement:{id:measurementId,date,weight,height,bmi,recorded_by_role:"client",created_at:stamp}},201,headers);
+    return json({success:true,message:"Measurement saved securely.",measurement:{id:measurementId,date,time,weight,height,bmi,recorded_by_role:"client",created_at:stamp}},201,headers);
    }
    const clientMeasurementDelete=path.match(/^\/client\/measurements\/([a-zA-Z0-9_-]+)$/);
    if(clientMeasurementDelete&&request.method==="DELETE"){
@@ -846,15 +846,15 @@ export default {
     const connected=await env.DB.prepare("SELECT 1 AS ok FROM dietitian_requests WHERE practice_id=? AND client_user_id=? AND dietitian_user_id=? AND status='accepted' UNION SELECT 1 AS ok FROM client_profiles WHERE practice_id=? AND user_id=? AND assigned_dietitian_user_id=? LIMIT 1").bind(practiceId,clientId,session.user_id,practiceId,clientId,session.user_id).first();
     if(!connected)return json({success:false,message:"Connected patient not found in this practice."},404,headers);
     if(!isWrite){
-     const rows=await env.DB.prepare("SELECT m.id,m.measurement_date AS date,m.weight_kg AS weight,m.height_cm AS height,m.bmi,m.recorded_by_role,m.note,m.created_at,u.display_name AS recorded_by_name FROM patient_measurements m LEFT JOIN app_users u ON u.id=m.recorded_by_user_id WHERE m.client_user_id=? ORDER BY m.measurement_date DESC,m.created_at DESC LIMIT 500").bind(clientId).all();
+     const rows=await env.DB.prepare("SELECT m.id,m.measurement_date AS date,m.measurement_time AS time,m.weight_kg AS weight,m.height_cm AS height,m.bmi,m.recorded_by_role,m.note,m.created_at,u.display_name AS recorded_by_name FROM patient_measurements m LEFT JOIN app_users u ON u.id=m.recorded_by_user_id WHERE m.client_user_id=? ORDER BY m.measurement_date DESC,m.measurement_time DESC,m.created_at DESC LIMIT 500").bind(clientId).all();
      return json({success:true,measurements:rows.results||[]},200,headers);
     }
-    const date=clean(b.date,10),weight=Number(b.weight),height=Number(b.height);
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+"T12:00:00Z"))||!(weight>0&&weight<500&&height>=50&&height<260))return json({success:false,message:"Enter a valid measurement date, weight and height."},400,headers);
+    const date=clean(b.date,10),time=clean(b.time,5)||"00:00",weight=Number(b.weight),height=Number(b.height);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+"T12:00:00Z"))||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)||!(weight>0&&weight<500&&height>=50&&height<260))return json({success:false,message:"Enter a valid measurement date, time, weight and height."},400,headers);
     const measurementId=id(),bmi=Number((weight/((height/100)**2)).toFixed(1)),stamp=now();
-    await env.DB.prepare("INSERT INTO patient_measurements(id,client_user_id,practice_id,measurement_date,weight_kg,height_cm,bmi,recorded_by_user_id,recorded_by_role,note,created_at) VALUES(?,?,?,?,?,?,?,?, 'dietitian',?,?)").bind(measurementId,clientId,practiceId,date,weight,height,bmi,session.user_id,clean(b.note,500),stamp).run();
+    await env.DB.prepare("INSERT INTO patient_measurements(id,client_user_id,practice_id,measurement_date,measurement_time,weight_kg,height_cm,bmi,recorded_by_user_id,recorded_by_role,note,created_at) VALUES(?,?,?,?,?,?,?,?,?, 'dietitian',?,?)").bind(measurementId,clientId,practiceId,date,time,weight,height,bmi,session.user_id,clean(b.note,500),stamp).run();
     await audit(env,session.user_id,practiceId,"patient_measurement.created","patient_measurement",measurementId,{client_user_id:clientId,measurement_date:date,source:"dietitian"});
-    return json({success:true,message:"Patient measurement saved to the shared record.",measurement:{id:measurementId,date,weight,height,bmi,recorded_by_role:"dietitian",recorded_by_name:session.display_name,created_at:stamp}},201,headers);
+    return json({success:true,message:"Patient measurement saved to the shared record.",measurement:{id:measurementId,date,time,weight,height,bmi,recorded_by_role:"dietitian",recorded_by_name:session.display_name,created_at:stamp}},201,headers);
    }
    if(path==="/dietitian/patient-food-diary"&&request.method==="GET"){
     if(!session)return json({success:false,message:"Sign in required."},401,headers);

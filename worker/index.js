@@ -659,6 +659,26 @@ export default {
     const rows=await env.DB.prepare("SELECT cp.user_id AS client_user_id,cp.preferred_name,cp.date_of_birth,cp.onboarding_status,u.display_name,u.email,cp.practice_id,p.name AS practice_name,cp.created_at,(SELECT COUNT(*) FROM diet_plans dp WHERE dp.practice_id=cp.practice_id AND dp.client_user_id=cp.user_id AND dp.dietitian_user_id=? AND dp.status!='archived') AS plan_count,(SELECT MAX(a.starts_at) FROM appointments a WHERE a.practice_id=cp.practice_id AND a.client_user_id=cp.user_id AND a.dietitian_user_id=?) AS next_appointment FROM client_profiles cp JOIN app_users u ON u.id=cp.user_id JOIN practices p ON p.id=cp.practice_id WHERE cp.practice_id=? AND (cp.assigned_dietitian_user_id=? OR EXISTS(SELECT 1 FROM dietitian_requests r WHERE r.practice_id=cp.practice_id AND r.client_user_id=cp.user_id AND r.dietitian_user_id=? AND r.status='accepted')) AND u.status IN ('active','invited') ORDER BY u.display_name LIMIT 300").bind(session.user_id,session.user_id,practiceId,session.user_id,session.user_id).all();
     return json({success:true,patients:rows.results||[]},200,headers);
    }
+   // Patients can view tasks assigned by their connected dietitian and update their own status.
+   if(path==="/client/tasks"&&request.method==="GET"){
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    if(session.account_type!=="client")return json({success:false,message:"Client account required."},403,headers);
+    const rows=await env.DB.prepare("SELECT t.id,t.title,t.description,t.due_at,t.status,t.created_at,t.updated_at,t.completed_at,u.display_name AS dietitian_name FROM patient_tasks t LEFT JOIN app_users u ON u.id=t.dietitian_user_id WHERE t.client_user_id=? ORDER BY CASE WHEN t.status='completed' THEN 1 ELSE 0 END,t.due_at IS NULL,t.due_at ASC,t.created_at DESC LIMIT 300").bind(session.user_id).all();
+    return json({success:true,tasks:rows.results||[]},200,headers);
+   }
+   const clientTaskId=path.startsWith("/client/tasks/")?clean(path.slice("/client/tasks/".length),80):"";
+   if(clientTaskId&&request.method==="PATCH"){
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    if(session.account_type!=="client")return json({success:false,message:"Client account required."},403,headers);
+    const b=await body(request),status=clean(b.status,20);
+    if(!["pending","in_progress","completed"].includes(status))return json({success:false,message:"Choose To do, In progress or Done."},400,headers);
+    const task=await env.DB.prepare("SELECT id,practice_id FROM patient_tasks WHERE id=? AND client_user_id=?").bind(clientTaskId,session.user_id).first();
+    if(!task)return json({success:false,message:"Task not found for this patient."},404,headers);
+    const stamp=now(),completedAt=status==="completed"?stamp:null;
+    await env.DB.prepare("UPDATE patient_tasks SET status=?,updated_at=?,completed_at=? WHERE id=? AND client_user_id=?").bind(status,stamp,completedAt,task.id,session.user_id).run();
+    await audit(env,session.user_id,task.practice_id,"patient_task.status_updated","patient_task",task.id,{status});
+    return json({success:true,message:"Task status updated.",status,updated_at:stamp,completed_at:completedAt},200,headers);
+   }
    // Shared account-level measurements: the client tracker and connected care team
    // read and write the same records. Client identity is taken from the session.
    if(path==="/client/measurements"&&(request.method==="GET"||request.method==="POST")) {
@@ -833,6 +853,29 @@ export default {
     return json({success:true,message_id:messageId},201,headers);
    }
 
+   // Dietitian task management for an explicitly connected patient in the selected practice.
+   if(path==="/dietitian/patient-tasks"&&(request.method==="GET"||request.method==="POST")){
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    if(session.account_type!=="dietitian"||session.is_platform_admin)return json({success:false,message:"Dietitian access required."},403,headers);
+    const isWrite=request.method==="POST",b=isWrite?await body(request):null;
+    const practiceId=clean(isWrite?b.practice_id:url.searchParams.get("practice_id"),80),clientId=clean(isWrite?b.client_user_id:url.searchParams.get("client_user_id"),80);
+    if(!practiceId||!clientId)return json({success:false,message:"Practice and patient are required."},400,headers);
+    const member=session.memberships.find(m=>m.practice_id===practiceId&&m.role==="dietitian"&&m.status==="active");
+    if(!member)return json({success:false,message:"Active dietitian practice membership required."},403,headers);
+    const connected=await env.DB.prepare("SELECT 1 AS ok FROM dietitian_requests WHERE practice_id=? AND client_user_id=? AND dietitian_user_id=? AND status='accepted' UNION SELECT 1 AS ok FROM client_profiles WHERE practice_id=? AND user_id=? AND assigned_dietitian_user_id=? LIMIT 1").bind(practiceId,clientId,session.user_id,practiceId,clientId,session.user_id).first();
+    if(!connected)return json({success:false,message:"Connected patient not found in this practice."},404,headers);
+    if(!isWrite){
+     const rows=await env.DB.prepare("SELECT t.id,t.title,t.description,t.due_at,t.status,t.created_at,t.updated_at,t.completed_at,u.display_name AS dietitian_name FROM patient_tasks t LEFT JOIN app_users u ON u.id=t.dietitian_user_id WHERE t.practice_id=? AND t.client_user_id=? AND t.dietitian_user_id=? ORDER BY CASE WHEN t.status='completed' THEN 1 ELSE 0 END,t.due_at IS NULL,t.due_at ASC,t.created_at DESC LIMIT 300").bind(practiceId,clientId,session.user_id).all();
+     return json({success:true,tasks:rows.results||[]},200,headers);
+    }
+    const title=clean(b.title,120),description=clean(b.description,1000),dueAt=b.due_at?new Date(b.due_at):null;
+    if(!title)return json({success:false,message:"A task title is required."},400,headers);
+    if(b.due_at&&(!dueAt||!Number.isFinite(dueAt.getTime())))return json({success:false,message:"Enter a valid due date and time."},400,headers);
+    const taskId=id(),stamp=now(),dueIso=dueAt?dueAt.toISOString():null;
+    await env.DB.prepare("INSERT INTO patient_tasks(id,practice_id,dietitian_user_id,client_user_id,title,description,due_at,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'pending',?,?)").bind(taskId,practiceId,session.user_id,clientId,title,description,dueIso,stamp,stamp).run();
+    await audit(env,session.user_id,practiceId,"patient_task.created","patient_task",taskId,{client_user_id:clientId,title,due_at:dueIso});
+    return json({success:true,message:"Task assigned to the patient.",task:{id:taskId,title,description,due_at:dueIso,status:"pending",created_at:stamp,updated_at:stamp}},201,headers);
+   }
    // Dietitian access is restricted to a connected patient in the selected practice.
    if(path==="/dietitian/patient-measurements"&&(request.method==="GET"||request.method==="POST")){
     if(!session)return json({success:false,message:"Sign in required."},401,headers);

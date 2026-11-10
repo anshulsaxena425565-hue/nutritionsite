@@ -1234,3 +1234,17 @@ td b{color:#2e3a54}
 .profile-legal-links{display:flex;gap:12px;flex-wrap:wrap}
 .profile-legal-links a{display:inline-flex;align-items:center;gap:8px;padding:11px 14px;border:1px solid var(--line,#e7e8ee);border-radius:12px;background:var(--surface,#fff)}
 @media(max-width:520px){.auth-legal-footer{align-items:flex-start;flex-direction:column}.auth-legal-footer nav{gap:12px}}
+
+/* Patient task reminders: compact, thumb-friendly cards that stack on mobile. */
+.patient-task-reminders{background:var(--surface,#fff);border:1px solid var(--border,#e7e9f2);border-radius:20px;padding:20px;margin:18px 0;box-shadow:0 8px 28px rgba(22,31,74,.05)}
+.patient-task-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}
+.patient-task-heading h3{margin:5px 0 3px;font-size:19px}.patient-task-heading p{margin:0;color:var(--muted,#68708a);font-size:13px}
+.patient-task-count{white-space:nowrap;border-radius:999px;background:#eef0ff;color:#242b83;padding:7px 11px;font-size:12px;font-weight:700}
+.patient-task-list{display:grid;gap:10px}
+.patient-task-item{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px;border:1px solid var(--border,#e7e9f2);border-radius:14px;background:var(--surface-soft,#fafbff)}
+.patient-task-main{display:flex;align-items:flex-start;gap:11px;min-width:0}
+.patient-task-icon{width:36px;height:36px;flex:0 0 36px;border-radius:11px;background:#eef0ff;color:#343b9b;display:grid;place-items:center}
+.patient-task-copy{min-width:0}.patient-task-copy b{display:block;font-size:14px}.patient-task-copy p{margin:4px 0;color:var(--muted,#68708a);font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}.patient-task-copy small{display:block;margin-top:5px;color:var(--muted,#68708a);font-size:11px}.patient-task-copy small.is-overdue{color:#b42318;font-weight:700}
+.patient-task-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}.patient-task-actions select{min-height:38px;border:1px solid var(--border,#dfe2ee);border-radius:10px;padding:6px 9px;background:var(--surface,#fff);max-width:130px}
+.patient-task-item.is-complete{opacity:.76}.patient-task-empty{display:grid;justify-items:center;text-align:center;gap:7px;padding:25px 12px;color:var(--muted,#68708a)}.patient-task-empty b{color:var(--text,#20243a)}.patient-task-empty p{margin:0;font-size:13px}
+@media(max-width:640px){.patient-task-reminders{padding:15px;margin:14px 0;border-radius:16px}.patient-task-heading{gap:8px}.patient-task-heading h3{font-size:17px}.patient-task-item{align-items:flex-start;flex-direction:column;gap:10px;padding:12px}.patient-task-actions{width:100%;justify-content:space-between}.patient-task-actions select{flex:1;max-width:none;min-height:42px}.patient-task-copy b{font-size:14px}}

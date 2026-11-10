@@ -666,13 +666,13 @@ export default {
     const rows=await env.DB.prepare("SELECT t.id,t.title,t.description,t.due_at,t.status,t.created_at,t.updated_at,t.completed_at,u.display_name AS dietitian_name FROM patient_tasks t LEFT JOIN app_users u ON u.id=t.dietitian_user_id WHERE t.client_user_id=? ORDER BY CASE WHEN t.status='completed' THEN 1 ELSE 0 END,t.due_at IS NULL,t.due_at ASC,t.created_at DESC LIMIT 300").bind(session.user_id).all();
     return json({success:true,tasks:rows.results||[]},200,headers);
    }
-   const clientTaskMatch=path.match(/^\\/client\\/tasks\\/([a-zA-Z0-9_-]+)$/);
-   if(clientTaskMatch&&request.method==="PATCH"){
+   const clientTaskId=path.startsWith("/client/tasks/")?clean(path.slice("/client/tasks/".length),80):"";
+   if(clientTaskId&&request.method==="PATCH"){
     if(!session)return json({success:false,message:"Sign in required."},401,headers);
     if(session.account_type!=="client")return json({success:false,message:"Client account required."},403,headers);
     const b=await body(request),status=clean(b.status,20);
     if(!["pending","in_progress","completed"].includes(status))return json({success:false,message:"Choose To do, In progress or Done."},400,headers);
-    const task=await env.DB.prepare("SELECT id,practice_id FROM patient_tasks WHERE id=? AND client_user_id=?").bind(clientTaskMatch[1],session.user_id).first();
+    const task=await env.DB.prepare("SELECT id,practice_id FROM patient_tasks WHERE id=? AND client_user_id=?").bind(clientTaskId,session.user_id).first();
     if(!task)return json({success:false,message:"Task not found for this patient."},404,headers);
     const stamp=now(),completedAt=status==="completed"?stamp:null;
     await env.DB.prepare("UPDATE patient_tasks SET status=?,updated_at=?,completed_at=? WHERE id=? AND client_user_id=?").bind(status,stamp,completedAt,task.id,session.user_id).run();

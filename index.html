@@ -230,7 +230,9 @@
       .journey-review-row{font-size:12px}
     }
 
-  </style>
+  
+.assessment-invite{padding:0 0 82px;background:#edf0e7}.assessment-invite-card{border:1px solid #dce5d8;border-radius:26px;background:linear-gradient(115deg,#e4ebdf,#f4e8da 72%,#f6e4d9);padding:clamp(28px,5vw,54px);display:grid;grid-template-columns:1.2fr .8fr;align-items:center;gap:35px;overflow:hidden;position:relative}.assessment-invite-copy{position:relative;z-index:1}.assessment-invite-copy h2{font:600 clamp(32px,4vw,47px)/1.12 'Playfair Display',serif;letter-spacing:-1px;margin:12px 0}.assessment-invite-copy p{color:#647568;max-width:620px;line-height:1.8;font-size:14px}.assessment-invite-copy .btn{margin-top:7px}.assessment-invite-copy>small{display:block;color:#7c8a7d;font-size:10px;margin-top:12px}.assessment-invite-art{height:220px;position:relative;display:grid;place-items:center}.invite-orbit{position:absolute;width:200px;height:200px;border:1px solid #66866755;border-radius:50%;box-shadow:0 0 0 21px #ffffff18,0 0 0 45px #ffffff12}.invite-sheet{position:relative;width:145px;height:175px;background:#fffdf8;border:1px solid #dfe7db;border-radius:14px;box-shadow:0 18px 35px #2b47201c;padding:20px 16px;transform:rotate(-5deg)}.invite-sheet b{display:block;color:#5c7d5e;font-size:9px;letter-spacing:1.3px;margin-bottom:18px}.invite-sheet i{display:block;height:6px;border-radius:10px;background:#e6ece2;margin:12px 0}.invite-sheet i:nth-of-type(1){width:90%}.invite-sheet i:nth-of-type(2){width:72%}.invite-sheet i:nth-of-type(3){width:82%}.invite-sheet i:nth-of-type(4){width:54%}.invite-sheet span{position:absolute;right:13px;bottom:13px;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#e6efe2;color:#47744b;font-weight:800}.invite-dot{position:absolute;right:13%;top:10%;font-size:32px;color:#a17f52}@media(max-width:700px){.assessment-invite{padding-bottom:60px}.assessment-invite-card{grid-template-columns:1fr;padding:27px 23px}.assessment-invite-art{height:145px}.invite-orbit{width:130px;height:130px}.invite-sheet{transform:scale(.78) rotate(-5deg)}.links a[href="/assessment/"]{display:none}}
+</style>
 </head>
 <body>
   <header class="nav">
@@ -238,7 +240,7 @@
       <a class="brand" href="#home" aria-label="Prachi Sayani home">prachi sayani<span>.</span></a>
       <button class="menu-btn" id="menuBtn" aria-label="Toggle navigation" aria-expanded="false">☰</button>
       <nav class="links" id="navLinks" aria-label="Main navigation">
-        <a href="#about">About</a><a href="#services">Services</a><a href="#pricing">Packages</a><a href="#approach">My approach</a><a href="#credentials">Background</a><a class="btn" href="#contact">Let's connect ↗</a>
+        <a href="#about">About</a><a href="#services">Services</a><a href="#pricing">Packages</a><a href="#approach">My approach</a><a href="#credentials">Background</a><a href="/assessment/">Nutrition intake</a><a class="btn" href="#contact">Let's connect ↗</a>
       </nav>
     </div>
   </header>
@@ -249,7 +251,7 @@
           <span class="eyebrow">Nutrition • Wellbeing • You</span>
           <h1>Feel good.<br>Eat well.<br><em>Live fully.</em></h1>
           <p>Nutrition doesn't have to be complicated. Let's make it practical, personal, and rooted in evidence — one small, sustainable step at a time.</p>
-          <div class="actions"><a class="btn" href="#contact">Start a conversation <span>↗</span></a><a class="btn outline" href="#about">Get to know me</a></div>
+          <div class="actions"><a class="btn" href="#contact">Start a conversation <span>↗</span></a><a class="btn outline" href="#about">Get to know me</a><a class="btn outline" href="/assessment/">Complete nutrition intake</a></div>
           <div class="trust-row"><div class="trust-mark"><span>✳</span><span>♡</span><span>✓</span></div><span>Personalised guidance. A more balanced relationship with food.</span></div>
         </div>
         <div class="hero-art reveal" aria-label="Decorative botanical illustration">
@@ -319,6 +321,19 @@
           <article class="credential reveal"><span>📚</span><h3>M.Sc. Clinical Nutrition & Dietetics</h3><p>SNDT Women's University, Juhu · 2026–2028 (in progress)</p></article>
           <article class="credential reveal"><span>🌿</span><h3>Low-FODMAP Diet for IBS</h3><p>Certification from Monash University</p></article>
         </div>
+      </div>
+    </section>
+
+    <section class="assessment-invite" aria-labelledby="assessment-invite-title">
+      <div class="wrap assessment-invite-card">
+        <div class="assessment-invite-copy">
+          <span class="kicker">A little preparation, a more personal conversation</span>
+          <h2 id="assessment-invite-title">Start with your nutrition story.</h2>
+          <p>Complete a guided intake covering body measurements, food patterns and your goals. Each measurement includes a simple explanation, so you can fill in what you know and leave the rest for your appointment.</p>
+          <a class="btn" href="/assessment/">Start your nutrition intake <span>↗</span></a>
+          <small>About 5–8 minutes · You can skip measurements you do not know</small>
+        </div>
+        <div class="assessment-invite-art" aria-hidden="true"><span class="invite-orbit"></span><div class="invite-sheet"><b>YOUR INTAKE</b><i></i><i></i><i></i><i></i><span>✓</span></div><div class="invite-dot">✦</div></div>
       </div>
     </section>
     <section class="contact" id="contact">

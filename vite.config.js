@@ -5,7 +5,7 @@ import { mkdir, copyFile } from 'node:fs/promises';
 const cleanDirectoryRoutes = {
   name: 'clean-directory-routes',
   async closeBundle() {
-    for (const page of ['portal', 'privacy', 'terms']) {
+    for (const page of ['portal', 'privacy', 'terms', 'assessment']) {
       await mkdir(`dist/${page}`, { recursive: true });
       await copyFile(`dist/${page}.html`, `dist/${page}/index.html`);
     }
@@ -19,6 +19,7 @@ export default defineConfig({
       input: {
         main: 'index.html',
         portal: 'portal.html',
+        assessment: 'assessment.html',
         privacy: 'privacy.html',
         terms: 'terms.html'
       }

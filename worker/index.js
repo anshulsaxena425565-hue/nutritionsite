@@ -51,6 +51,48 @@ async function getSession(request, env) {
 async function audit(env, actor, practiceId, action, resourceType, resourceId = null, metadata = {}) {
   await env.DB.prepare("INSERT INTO audit_logs(id,practice_id,actor_user_id,action,resource_type,resource_id,metadata_json) VALUES(?,?,?,?,?,?,?)").bind(id(), practiceId, actor, action, resourceType, resourceId, JSON.stringify(metadata)).run();
 }
+
+function xmlSafe(value){
+ const safe=[...String(value??"")].filter(ch=>{const n=ch.charCodeAt(0);return n===9||n===10||n===13||n>=32}).join("");
+ return safe.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&apos;");
+}
+function zipStore(files){
+ const enc=new TextEncoder(),locals=[],centrals=[];
+ const u32=n=>[n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255];
+ const crc32=bytes=>{let crc=0xffffffff;for(const b of bytes){crc^=b;for(let k=0;k<8;k++)crc=(crc>>>1)^((crc&1)?0xedb88320:0)}return (crc^0xffffffff)>>>0};
+ let offset=0,centralSize=0;
+ for(const file of files){
+  const name=enc.encode(file.name),data=typeof file.data==="string"?enc.encode(file.data):file.data,crc=crc32(data);
+  const local=new Uint8Array(30+name.length),lv=new DataView(local.buffer);
+  lv.setUint32(0,0x04034b50,true);lv.setUint16(4,20,true);lv.setUint16(6,0,true);lv.setUint16(8,0,true);lv.setUint16(10,0,true);lv.setUint16(12,0,true);lv.setUint32(14,crc,true);lv.setUint32(18,data.length,true);lv.setUint32(22,data.length,true);lv.setUint16(26,name.length,true);lv.setUint16(28,0,true);local.set(name,30);
+  locals.push(local,data);
+  const central=new Uint8Array(46+name.length),cv=new DataView(central.buffer);
+  cv.setUint32(0,0x02014b50,true);cv.setUint16(4,20,true);cv.setUint16(6,20,true);cv.setUint16(8,0,true);cv.setUint16(10,0,true);cv.setUint16(12,0,true);cv.setUint16(14,0,true);cv.setUint32(16,crc,true);cv.setUint32(20,data.length,true);cv.setUint32(24,data.length,true);cv.setUint16(28,name.length,true);cv.setUint16(30,0,true);cv.setUint16(32,0,true);cv.setUint16(34,0,true);cv.setUint16(36,0,true);cv.setUint32(38,0,true);cv.setUint32(42,offset,true);central.set(name,46);
+  centrals.push(central);offset+=local.length+data.length;centralSize+=central.length;
+ }
+ const end=new Uint8Array(22),ev=new DataView(end.buffer);ev.setUint32(0,0x06054b50,true);ev.setUint16(4,0,true);ev.setUint16(6,0,true);ev.setUint16(8,files.length,true);ev.setUint16(10,files.length,true);ev.setUint32(12,centralSize,true);ev.setUint32(16,offset,true);ev.setUint16(20,0,true);
+ const out=new Uint8Array(offset+centralSize+end.length);let pos=0;for(const part of [...locals,...centrals,end]){out.set(part,pos);pos+=part.length}return out;
+}
+function makeAssessmentDocx(fullName,reference,submitted,fields){
+ const para=(text,size=22,bold=false,color="26382D")=>'<w:p><w:pPr><w:spacing w:after="100"/></w:pPr><w:r><w:rPr><w:sz w:val="'+size+'"/>'+(bold?'<w:b/>':'')+'<w:color w:val="'+color+'"/></w:rPr><w:t xml:space="preserve">'+xmlSafe(text)+'</w:t></w:r></w:p>';
+ const borders='<w:tblBorders><w:top w:val="single" w:sz="5" w:color="DCE5D8"/><w:left w:val="single" w:sz="5" w:color="DCE5D8"/><w:bottom w:val="single" w:sz="5" w:color="DCE5D8"/><w:right w:val="single" w:sz="5" w:color="DCE5D8"/><w:insideH w:val="single" w:sz="4" w:color="E7ECE4"/><w:insideV w:val="single" w:sz="4" w:color="E7ECE4"/></w:tblBorders>';
+ const rows=fields.map(([label,value],i)=>'<w:tr><w:tc><w:tcPr><w:tcW w:w="3300" w:type="dxa"/>'+(i%2===0?'<w:shd w:fill="F1F5EF"/>':'')+'</w:tcPr>'+para(label,19,true,"526B54")+'</w:tc><w:tc><w:tcPr><w:tcW w:w="6200" w:type="dxa"/></w:tcPr>'+para(value||"Not provided",19,false,"26382D")+'</w:tc></w:tr>').join("");
+ const documentXml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+para("PRACHI SAYANI · NUTRITION INTAKE ASSESSMENT",30,true,"315A45")+para("CONFIDENTIAL · Patient-reported information",18,true,"718270")+para("Name: "+fullName+"   |   Submitted: "+submitted,19,false)+para("Reference: "+reference,16,false)+'<w:tbl><w:tblPr><w:tblW w:w="9500" w:type="dxa"/>'+borders+'</w:tblPr><w:tblGrid><w:gridCol w:w="3300"/><w:gridCol w:w="6200"/></w:tblGrid>'+rows+'</w:tbl>'+para("Clinical note",21,true,"315A45")+para("This document records information supplied through the intake form. Calculated values are estimates and should be reviewed in context. It is not a diagnosis or a substitute for clinical assessment.",17,false,"647464")+'<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="900" w:right="900" w:bottom="900" w:left="900"/></w:sectPr></w:body></w:document>';
+ const contentTypes='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>';
+ const rels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
+ return zipStore([{name:"[Content_Types].xml",data:contentTypes},{name:"_rels/.rels",data:rels},{name:"word/document.xml",data:documentXml}]);
+}
+function makeAssessmentPdf(fullName,reference,submitted,fields){
+ const ascii=s=>String(s??"").normalize("NFKD").split("").map(ch=>{const n=ch.charCodeAt(0);if(n<32||n>126)return "?";if(ch==="("||ch===")"||ch==="\\")return "\\"+ch;return ch}).join("");
+ const wrap=(s,max=84)=>{const words=String(s).replace(/\s+/g," ").split(" "),out=[];let line="";for(const word of words){if((line+" "+word).trim().length>max&&line){out.push(line);line=word}else line=(line+" "+word).trim()}if(line)out.push(line);return out};
+ const lines=["CONFIDENTIAL | Patient-reported information","Name: "+fullName,"Submitted: "+submitted,"Reference: "+reference,"","PATIENT & CONTACT DETAILS",...fields.slice(0,6).flatMap(([k,v])=>wrap(k+": "+(v||"Not provided"))),"","BODY MEASUREMENTS",...fields.slice(6,19).flatMap(([k,v])=>wrap(k+": "+(v||"Not provided"))),"","HEALTH & LIFESTYLE",...fields.slice(19).flatMap(([k,v])=>wrap(k+": "+(v||"Not provided"))),"","CLINICAL NOTE","This document records information supplied through the intake form. Derived values are estimates","and must be reviewed in context. This is not a diagnosis or a substitute for clinical assessment."];
+ const pages=[];for(let i=0;i<lines.length;i+=48)pages.push(lines.slice(i,i+48));
+ const objects=[];objects[1]="<< /Type /Catalog /Pages 2 0 R >>";objects[3]="<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
+ const kids=[];pages.forEach((page,index)=>{const pageId=4+index*2,contentId=pageId+1;kids.push(pageId+" 0 R");let stream="BT /F1 17 Tf 48 792 Td ("+ascii("Prachi Sayani - Nutrition Intake Assessment")+") Tj ET\nBT /F1 9 Tf 48 768 Td 13 TL ";stream+=page.map(line=>"("+ascii(line)+") Tj T*").join(" ");stream+=" ET";objects[pageId]="<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents "+contentId+" 0 R >>";objects[contentId]="<< /Length "+stream.length+" >>\nstream\n"+stream+"\nendstream"});
+ objects[2]="<< /Type /Pages /Kids ["+kids.join(" ")+"] /Count "+pages.length+" >>";
+ let pdf="%PDF-1.4\n",offsets=[0];for(let i=1;i<objects.length;i++){offsets[i]=pdf.length;pdf+=i+" 0 obj\n"+objects[i]+"\nendobj\n"}
+ const xref=pdf.length;pdf+="xref\n0 "+objects.length+"\n0000000000 65535 f \n";for(let i=1;i<objects.length;i++)pdf+=String(offsets[i]).padStart(10,"0")+" 00000 n \n";pdf+="trailer\n<< /Size "+objects.length+" /Root 1 0 R >>\nstartxref\n"+xref+"\n%%EOF";return pdf;
+}
 const PLAN_FEATURE_PATHS = {
   "/dietitian/plans": "diet_planning",
   "/dietitian/patients": "patient_management",
@@ -79,6 +121,22 @@ export default {
     const ref=id();
     await env.DB.prepare("INSERT INTO enquiries(id,name,email,phone,service,preferred_contact,goal,preferred_start,message,status,source) VALUES(?,?,?,?,?,?,?,?,?,'new',?)").bind(ref,name,email,clean(b.phone||b.jPhone,40),clean(b.service||b.service_name||b.journeyServiceName,160),clean(b.preferred_contact||b.jFormat,40),clean(b.goal||b.jGoal,1000),clean(b.preferred_start||b.jTimeline,120),clean(b.message||b.jContext,3000),"website").run();
     return json({success:true,message:"Thank you. Your enquiry has been received.",reference:ref},200,headers);
+   }
+
+   if(path==="/public/assessment-responses"&&request.method==="POST"){
+    const b=await body(request),answers=b.answers&&typeof b.answers==="object"&&!Array.isArray(b.answers)?b.answers:{},fullName=clean(answers.full_name,120),email=clean(answers.email,254).toLowerCase(),phone=clean(answers.phone,40);
+    if(clean(b.website||answers.website,200))return json({success:true,message:"Assessment received."},200,headers);
+    if(fullName.length<2||!emailOk(email))return json({success:false,message:"Please provide your name and a valid email address."},400,headers);
+    if(answers.consent!=="yes")return json({success:false,message:"Please confirm the privacy notice before submitting."},400,headers);
+    const numericKeys=["height_cm","weight_kg","usual_weight_kg","waist_cm","hip_cm","mid_upper_arm_cm","calf_cm"];
+    for(const key of numericKeys){const value=answers[key];if(value!==undefined&&value!==""&&(!Number.isFinite(Number(value))||Number(value)<=0||Number(value)>500))return json({success:false,message:"Check the measurement entered for "+key.replace(/_/g," ")+". Values must be positive and within a plausible entry range."},400,headers);}
+    const clientIp=request.headers.get("CF-Connecting-IP")||"unknown",ipHash=await hash(clientIp),stamp=now();
+    const attempt=await env.DB.prepare("INSERT INTO assessment_submission_limits(ip_hash,window_started_at,request_count) VALUES(?,?,1) ON CONFLICT(ip_hash) DO UPDATE SET request_count=CASE WHEN julianday('now')-julianday(assessment_submission_limits.window_started_at)>15.0/1440.0 THEN 1 ELSE assessment_submission_limits.request_count+1 END,window_started_at=CASE WHEN julianday('now')-julianday(assessment_submission_limits.window_started_at)>15.0/1440.0 THEN excluded.window_started_at ELSE assessment_submission_limits.window_started_at END RETURNING request_count").bind(ipHash,stamp).first();
+    if(Number(attempt?.request_count||0)>5)return json({success:false,message:"Too many submissions from this connection. Please try again in about 15 minutes."},429,headers);
+    const safeAnswers={...answers};delete safeAnswers.website;
+    const responseId=id();
+    await env.DB.prepare("INSERT INTO assessment_responses(id,full_name,email,phone,answers_json,calculated_json,created_at) VALUES(?,?,?,?,?,?,?)").bind(responseId,fullName,email,phone,JSON.stringify(safeAnswers),JSON.stringify(b.calculated||{}),stamp).run();
+    return json({success:true,message:"Your assessment has been received.",reference:responseId},201,headers);
    }
    if (path === "/auth/register" && request.method === "POST") {
     const b=await body(request),name=clean(b.full_name,120),email=clean(b.email,254).toLowerCase(),phone=clean(b.mobile,24).replace(/[\\s()+.-]/g,""),password=b.password,accountType=b.account_type==="dietitian"?"dietitian":"client";
@@ -214,6 +272,29 @@ export default {
     if(!session?.is_platform_admin) return json({success:false,message:"Platform administrator access required."},session?403:401,headers);
  
 
+
+   if(path==="/admin/assessment-responses"&&request.method==="GET"){
+    const rows=await env.DB.prepare("SELECT id,full_name,email,phone,answers_json,calculated_json,created_at FROM assessment_responses ORDER BY created_at DESC LIMIT 1000").all();
+    const responses=(rows.results||[]).map(r=>{let answers={},calculated={};try{answers=JSON.parse(r.answers_json||"{}")}catch{}try{calculated=JSON.parse(r.calculated_json||"{}")}catch{}return {...r,answers,calculated}});return json({success:true,responses},200,headers);
+   }
+
+   const assessmentDoc=path.match(/^\/admin\/assessment-responses\/([a-f0-9-]+)\/document$/);
+   if(assessmentDoc&&request.method==="GET"){
+    const row=await env.DB.prepare("SELECT id,full_name,email,phone,answers_json,calculated_json,created_at FROM assessment_responses WHERE id=?").bind(assessmentDoc[1]).first();
+    if(!row)return json({success:false,message:"Assessment response not found."},404,headers);
+    let answers={},calculated={};try{answers=JSON.parse(row.answers_json||"{}")}catch{}try{calculated=JSON.parse(row.calculated_json||"{}")}catch{}
+    const fields=[
+     ["Full name",row.full_name],["Email address",row.email],["Mobile number",row.phone],["Consent to use information",answers.consent==="yes"?"Confirmed":"Not confirmed"],["Date of birth",answers.date_of_birth],["Sex (self-reported)",answers.sex],["Preferred name",answers.preferred_name],
+     ["Height",answers.height_cm?answers.height_cm+" cm":""],["Current weight",answers.weight_kg?answers.weight_kg+" kg":""],["Usual weight",answers.usual_weight_kg?answers.usual_weight_kg+" kg":""],["Usual weight time period",answers.weight_change_period],
+     ["Waist circumference",answers.waist_cm?answers.waist_cm+" cm":""],["Hip circumference",answers.hip_cm?answers.hip_cm+" cm":""],["Mid-upper arm circumference (MUAC)",answers.mid_upper_arm_cm?answers.mid_upper_arm_cm+" cm":""],["Calf circumference",answers.calf_cm?answers.calf_cm+" cm":""],["Skinfold status",answers.skinfold_status],["Skinfold sites / values",answers.skinfold_sites],["Other measurements / body composition",answers.other_measurements],
+     ["BMI (derived estimate)",calculated.bmi||""],["Waist-to-hip ratio (derived estimate)",calculated.whr||""],["Main goal",answers.main_goal],["Usual food pattern",answers.diet_pattern],["Relevant health conditions / concerns",answers.medical_context],["Food allergies / intolerances",answers.allergies],["Medicines / supplements",answers.medications],["Usual activity",answers.activity],["Sleep duration",answers.sleep],["Additional notes",answers.notes]
+    ].map(([k,v])=>[k,v===undefined||v===null||String(v)===""?"Not provided":String(v)]);
+    const submitted=new Date(row.created_at).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"});
+    const format=url.searchParams.get("format")==="docx"?"docx":"pdf";
+    const safeId=row.id.replace(/[^a-f0-9-]/g,"");
+    if(format==="docx")return new Response(makeAssessmentDocx(row.full_name,safeId,submitted,fields),{status:200,headers:{...headers,"Content-Type":"application/vnd.openxmlformats-officedocument.wordprocessingml.document","Content-Disposition":'attachment; filename="prachi-assessment-'+safeId+'.docx"'}});
+    return new Response(makeAssessmentPdf(row.full_name,safeId,submitted,fields),{status:200,headers:{...headers,"Content-Type":"application/pdf","Content-Disposition":'attachment; filename="prachi-assessment-'+safeId+'.pdf"'}});
+   }
    if(path==="/admin/theme"&&request.method==="POST"){const b=await body(request),color=String(b.primary_color||"").toUpperCase();if(!/^#[0-9A-F]{6}$/.test(color))return json({success:false,message:"Enter a valid six-digit HEX colour."},400,headers);await env.DB.prepare("CREATE TABLE IF NOT EXISTS platform_branding_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_by TEXT)").run();await env.DB.prepare("INSERT INTO platform_branding_settings(setting_key,setting_value,updated_at,updated_by) VALUES('primary_color',?,CURRENT_TIMESTAMP,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=CURRENT_TIMESTAMP,updated_by=excluded.updated_by").bind(color,session.user_id).run();await audit(env,session.user_id,null,"platform.branding.updated","branding","primary_color",{primary_color:color});return json({success:true,message:"Brand theme updated.",theme:{primary_color:color}},200,headers)}
    if(path==="/admin/module-controls"&&request.method==="GET"){
     const moduleInfo={

@@ -53,7 +53,8 @@ async function audit(env, actor, practiceId, action, resourceType, resourceId = 
 }
 
 function xmlSafe(value){
- return String(value??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&apos;");
+ const safe=[...String(value??"")].filter(ch=>{const n=ch.charCodeAt(0);return n===9||n===10||n===13||n>=32}).join("");
+ return safe.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&apos;");
 }
 function zipStore(files){
  const enc=new TextEncoder(),locals=[],centrals=[];
@@ -283,7 +284,7 @@ export default {
     if(!row)return json({success:false,message:"Assessment response not found."},404,headers);
     let answers={},calculated={};try{answers=JSON.parse(row.answers_json||"{}")}catch{}try{calculated=JSON.parse(row.calculated_json||"{}")}catch{}
     const fields=[
-     ["Full name",row.full_name],["Email address",row.email],["Mobile number",row.phone],["Date of birth",answers.date_of_birth],["Sex (self-reported)",answers.sex],["Preferred name",answers.preferred_name],
+     ["Full name",row.full_name],["Email address",row.email],["Mobile number",row.phone],["Consent to use information",answers.consent==="yes"?"Confirmed":"Not confirmed"],["Date of birth",answers.date_of_birth],["Sex (self-reported)",answers.sex],["Preferred name",answers.preferred_name],
      ["Height",answers.height_cm?answers.height_cm+" cm":""],["Current weight",answers.weight_kg?answers.weight_kg+" kg":""],["Usual weight",answers.usual_weight_kg?answers.usual_weight_kg+" kg":""],["Usual weight time period",answers.weight_change_period],
      ["Waist circumference",answers.waist_cm?answers.waist_cm+" cm":""],["Hip circumference",answers.hip_cm?answers.hip_cm+" cm":""],["Mid-upper arm circumference (MUAC)",answers.mid_upper_arm_cm?answers.mid_upper_arm_cm+" cm":""],["Calf circumference",answers.calf_cm?answers.calf_cm+" cm":""],["Skinfold status",answers.skinfold_status],["Skinfold sites / values",answers.skinfold_sites],["Other measurements / body composition",answers.other_measurements],
      ["BMI (derived estimate)",calculated.bmi||""],["Waist-to-hip ratio (derived estimate)",calculated.whr||""],["Main goal",answers.main_goal],["Usual food pattern",answers.diet_pattern],["Relevant health conditions / concerns",answers.medical_context],["Food allergies / intolerances",answers.allergies],["Medicines / supplements",answers.medications],["Usual activity",answers.activity],["Sleep duration",answers.sleep],["Additional notes",answers.notes]
@@ -291,8 +292,8 @@ export default {
     const submitted=new Date(row.created_at).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"});
     const format=url.searchParams.get("format")==="docx"?"docx":"pdf";
     const safeId=row.id.replace(/[^a-f0-9-]/g,"");
-    if(format==="docx")return new Response(makeAssessmentDocx(row.full_name,safeId,submitted,fields),{status:200,headers:{...headers,"Content-Type":"application/vnd.openxmlformats-officedocument.wordprocessingml.document","Content-Disposition":"attachment; filename=\\\"prachi-assessment-"+safeId+".docx\\\""}});
-    return new Response(makeAssessmentPdf(row.full_name,safeId,submitted,fields),{status:200,headers:{...headers,"Content-Type":"application/pdf","Content-Disposition":"attachment; filename=\\\"prachi-assessment-"+safeId+".pdf\\\""}});
+    if(format==="docx")return new Response(makeAssessmentDocx(row.full_name,safeId,submitted,fields),{status:200,headers:{...headers,"Content-Type":"application/vnd.openxmlformats-officedocument.wordprocessingml.document","Content-Disposition":'attachment; filename="prachi-assessment-"+safeId+".docx'}});
+    return new Response(makeAssessmentPdf(row.full_name,safeId,submitted,fields),{status:200,headers:{...headers,"Content-Type":"application/pdf","Content-Disposition":'attachment; filename="prachi-assessment-"+safeId+".pdf'}});
    }
    if(path==="/admin/theme"&&request.method==="POST"){const b=await body(request),color=String(b.primary_color||"").toUpperCase();if(!/^#[0-9A-F]{6}$/.test(color))return json({success:false,message:"Enter a valid six-digit HEX colour."},400,headers);await env.DB.prepare("CREATE TABLE IF NOT EXISTS platform_branding_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_by TEXT)").run();await env.DB.prepare("INSERT INTO platform_branding_settings(setting_key,setting_value,updated_at,updated_by) VALUES('primary_color',?,CURRENT_TIMESTAMP,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=CURRENT_TIMESTAMP,updated_by=excluded.updated_by").bind(color,session.user_id).run();await audit(env,session.user_id,null,"platform.branding.updated","branding","primary_color",{primary_color:color});return json({success:true,message:"Brand theme updated.",theme:{primary_color:color}},200,headers)}
    if(path==="/admin/module-controls"&&request.method==="GET"){

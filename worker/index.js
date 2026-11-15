@@ -124,12 +124,17 @@ export default {
 
    if(path==="/public/assessment-responses"&&request.method==="POST"){
     const b=await body(request),answers=b.answers&&typeof b.answers==="object"&&!Array.isArray(b.answers)?b.answers:{},fullName=clean(answers.full_name,120),email=clean(answers.email,254).toLowerCase(),phone=clean(answers.phone,40);
-    if(clean(b.website,200))return json({success:true,message:"Assessment received."},200,headers);
+    if(clean(b.website||answers.website,200))return json({success:true,message:"Assessment received."},200,headers);
     if(fullName.length<2||!emailOk(email))return json({success:false,message:"Please provide your name and a valid email address."},400,headers);
+    if(answers.consent!=="yes")return json({success:false,message:"Please confirm the privacy notice before submitting."},400,headers);
     const numericKeys=["height_cm","weight_kg","usual_weight_kg","waist_cm","hip_cm","mid_upper_arm_cm","calf_cm"];
     for(const key of numericKeys){const value=answers[key];if(value!==undefined&&value!==""&&(!Number.isFinite(Number(value))||Number(value)<=0||Number(value)>500))return json({success:false,message:"Check the measurement entered for "+key.replace(/_/g," ")+". Values must be positive and within a plausible entry range."},400,headers);}
-    const responseId=id(),stamp=now();
-    await env.DB.prepare("INSERT INTO assessment_responses(id,full_name,email,phone,answers_json,calculated_json,created_at) VALUES(?,?,?,?,?,?,?)").bind(responseId,fullName,email,phone,JSON.stringify(answers),JSON.stringify(b.calculated||{}),stamp).run();
+    const clientIp=request.headers.get("CF-Connecting-IP")||"unknown",ipHash=await hash(clientIp),stamp=now();
+    const attempt=await env.DB.prepare("INSERT INTO assessment_submission_limits(ip_hash,window_started_at,request_count) VALUES(?,?,1) ON CONFLICT(ip_hash) DO UPDATE SET request_count=CASE WHEN julianday('now')-julianday(assessment_submission_limits.window_started_at)>15.0/1440.0 THEN 1 ELSE assessment_submission_limits.request_count+1 END,window_started_at=CASE WHEN julianday('now')-julianday(assessment_submission_limits.window_started_at)>15.0/1440.0 THEN excluded.window_started_at ELSE assessment_submission_limits.window_started_at END RETURNING request_count").bind(ipHash,stamp).first();
+    if(Number(attempt?.request_count||0)>5)return json({success:false,message:"Too many submissions from this connection. Please try again in about 15 minutes."},429,headers);
+    const safeAnswers={...answers};delete safeAnswers.website;
+    const responseId=id();
+    await env.DB.prepare("INSERT INTO assessment_responses(id,full_name,email,phone,answers_json,calculated_json,created_at) VALUES(?,?,?,?,?,?,?)").bind(responseId,fullName,email,phone,JSON.stringify(safeAnswers),JSON.stringify(b.calculated||{}),stamp).run();
     return json({success:true,message:"Your assessment has been received.",reference:responseId},201,headers);
    }
    if (path === "/auth/register" && request.method === "POST") {

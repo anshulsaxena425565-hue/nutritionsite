@@ -106,9 +106,9 @@ async function makeQuestionnaireTemplateDocx(answers){
   occupation:text(answers.occupation),contact_number:text(answers.contact_number||answers.phone),
   email:text(answers.email),address:text(answers.address),physical_activity:text(answers.physical_activity),
   exercise_types:text(answers.exercise_types),exercise_duration:text(answers.exercise_duration),lifestyle:text(answers.lifestyle),
-  disease_status_and_details:text(answers.disease_status_and_details, text(answers.disease_status,"Not provided")+(answers.disease_details?": "+answers.disease_details:"")),
-  medication_status_and_details:text(answers.medication_status_and_details, text(answers.medication_status,"Not provided")+(answers.medication_details?": "+answers.medication_details:"")),
-  supplement_status_and_details:text(answers.supplement_status_and_details, text(answers.supplement_status,"Not provided")+(answers.supplement_details?": "+answers.supplement_details:"")),
+  disease_status_and_details:text(answers.disease_status_and_details,text(answers.disease_status,"Not provided")+(answers.disease_details?": "+answers.disease_details:"")),
+  medication_status_and_details:text(answers.medication_status_and_details,text(answers.medication_status,"Not provided")+(answers.medication_details?": "+answers.medication_details:"")),
+  supplement_status_and_details:text(answers.supplement_status_and_details,text(answers.supplement_status,"Not provided")+(answers.supplement_details?": "+answers.supplement_details:"")),
   height_cm:text(answers.height_cm)+" cm",weight_kg:text(answers.weight_kg)+" kg",bmi:text(answers.bmi),
   waist_cm:text(answers.waist_cm)+" cm",hip_cm:text(answers.hip_cm)+" cm",
   biochemical_parameters:text(answers.biochemical_parameters),hemoglobin:text(answers.hemoglobin),
@@ -119,15 +119,48 @@ async function makeQuestionnaireTemplateDocx(answers){
  const ffq=answers.ffq&&typeof answers.ffq==="object"?answers.ffq:{};
  for(let n=1;n<=35;n++){
   const selected=frequencyMap[text(ffq[String(n)],"")];
-  for(const key of Object.values(frequencyMap))values["ffq_"+String(n).padStart(2,"0")+"_"+key]=selected===key?"X":"";
+  for(const key of Object.values(frequencyMap)){
+   // Keep all five radio choices visible; fill only the selected option.
+   values["ffq_"+String(n).padStart(2,"0")+"_"+key]=selected===key?"●":"◯";
+  }
  }
- const doc=entries.find(x=>x.name==="word/document.xml"),decoder=new TextDecoder(),encoder=new TextEncoder();
+ const doc=entries.find(x=>x.name==="word/document.xml");
+ if(!doc)throw new Error("The supplied questionnaire template is missing its document body.");
+ const decoder=new TextDecoder(),encoder=new TextEncoder();
  let xml=decoder.decode(doc.data);
+
+ // Repair a malformed placeholder cell in the source template's Frequently
+ // column for even-numbered FFQ rows 10–34. Rebuild that one cell from the
+ // adjacent Daily cell's valid WordprocessingML, preserving the table layout.
+ for(let n=10;n<=34;n+=2){
+  const row=String(n).padStart(2,"0");
+  const daily="{{ffq_"+row+"_daily}}",frequent="{{ffq_"+row+"_frequently}}",sometimes="{{ffq_"+row+"_sometimes}}";
+  const dailyIndex=xml.indexOf(daily),sometimesIndex=xml.indexOf(sometimes);
+  if(dailyIndex<0||sometimesIndex<0)throw new Error("The FFQ template is incomplete at food item "+n+".");
+  const dailyCellStart=xml.lastIndexOf("<w:tc",dailyIndex);
+  const dailyCellEnd=xml.indexOf("</w:tc>",dailyIndex)+"</w:tc>".length;
+  const sometimesCellStart=xml.lastIndexOf("<w:tc",sometimesIndex);
+  if(dailyCellStart<0||dailyCellEnd<"</w:tc>".length||sometimesCellStart<=dailyCellEnd)
+   throw new Error("The FFQ template layout could not be repaired at food item "+n+".");
+  const dailyCell=xml.slice(dailyCellStart,dailyCellEnd);
+  let repairedCell=dailyCell.replace(daily,frequent);
+
+  // Preserve the paragraph identifier belonging to the target cell.
+  const targetPrefix=xml.slice(sometimesCellStart,sometimesCellStart+900);
+  const targetIdMatch=targetPrefix.match(/w14:paraId="([^"]+)"/);
+  const sourceIdMatch=repairedCell.match(/w14:paraId="([^"]+)"/);
+  if(targetIdMatch&&sourceIdMatch)repairedCell=repairedCell.replace('w14:paraId="'+sourceIdMatch[1]+'"','w14:paraId="'+targetIdMatch[1]+'"');
+
+  xml=xml.slice(0,dailyCellEnd)+repairedCell+xml.slice(sometimesCellStart);
+ }
+
  for(const [key,value] of Object.entries(values))xml=xml.replaceAll("{{"+key+"}}",xmlSafe(value));
+ if(xml.includes("{{ffq_"))throw new Error("Some FFQ selections could not be inserted into the questionnaire template.");
  if(/\{\{[^}]+\}\}/.test(xml))throw new Error("Some questionnaire fields could not be inserted into the supplied template.");
  doc.data=encoder.encode(xml);
  return zipStore(entries);
 }
+
 function makeAssessmentDocx(fullName,reference,submitted,fields){
  const para=(text,size=22,bold=false,color="26382D")=>'<w:p><w:pPr><w:spacing w:after="100"/></w:pPr><w:r><w:rPr><w:sz w:val="'+size+'"/>'+(bold?'<w:b/>':'')+'<w:color w:val="'+color+'"/></w:rPr><w:t xml:space="preserve">'+xmlSafe(text)+'</w:t></w:r></w:p>';
  const borders='<w:tblBorders><w:top w:val="single" w:sz="5" w:color="DCE5D8"/><w:left w:val="single" w:sz="5" w:color="DCE5D8"/><w:bottom w:val="single" w:sz="5" w:color="DCE5D8"/><w:right w:val="single" w:sz="5" w:color="DCE5D8"/><w:insideH w:val="single" w:sz="4" w:color="E7ECE4"/><w:insideV w:val="single" w:sz="4" w:color="E7ECE4"/></w:tblBorders>';

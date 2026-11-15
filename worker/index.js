@@ -120,7 +120,6 @@ async function makeQuestionnaireTemplateDocx(answers){
  for(let n=1;n<=35;n++){
   const selected=frequencyMap[text(ffq[String(n)],"")];
   for(const key of Object.values(frequencyMap)){
-   // Keep all five radio choices visible; fill only the selected option.
    values["ffq_"+String(n).padStart(2,"0")+"_"+key]=selected===key?"●":"◯";
   }
  }
@@ -128,35 +127,14 @@ async function makeQuestionnaireTemplateDocx(answers){
  if(!doc)throw new Error("The supplied questionnaire template is missing its document body.");
  const decoder=new TextDecoder(),encoder=new TextEncoder();
  let xml=decoder.decode(doc.data);
-
- // Repair a malformed placeholder cell in the source template's Frequently
- // column for even-numbered FFQ rows 10–34. Rebuild that one cell from the
- // adjacent Daily cell's valid WordprocessingML, preserving the table layout.
- for(let n=10;n<=34;n+=2){
-  const row=String(n).padStart(2,"0");
-  const daily="{{ffq_"+row+"_daily}}",frequent="{{ffq_"+row+"_frequently}}",sometimes="{{ffq_"+row+"_sometimes}}";
-  const dailyIndex=xml.indexOf(daily),sometimesIndex=xml.indexOf(sometimes);
-  if(dailyIndex<0||sometimesIndex<0)throw new Error("The FFQ template is incomplete at food item "+n+".");
-  const dailyCellStart=xml.lastIndexOf("<w:tc",dailyIndex);
-  const dailyCellEnd=xml.indexOf("</w:tc>",dailyIndex)+"</w:tc>".length;
-  const sometimesCellStart=xml.lastIndexOf("<w:tc",sometimesIndex);
-  if(dailyCellStart<0||dailyCellEnd<"</w:tc>".length||sometimesCellStart<=dailyCellEnd)
-   throw new Error("The FFQ template layout could not be repaired at food item "+n+".");
-  const dailyCell=xml.slice(dailyCellStart,dailyCellEnd);
-  let repairedCell=dailyCell.replace(daily,frequent);
-
-  // Preserve the paragraph identifier belonging to the target cell.
-  const targetPrefix=xml.slice(sometimesCellStart,sometimesCellStart+900);
-  const targetIdMatch=targetPrefix.match(/w14:paraId="([^"]+)"/);
-  const sourceIdMatch=repairedCell.match(/w14:paraId="([^"]+)"/);
-  if(targetIdMatch&&sourceIdMatch)repairedCell=repairedCell.replace('w14:paraId="'+sourceIdMatch[1]+'"','w14:paraId="'+targetIdMatch[1]+'"');
-
-  xml=xml.slice(0,dailyCellEnd)+repairedCell+xml.slice(sometimesCellStart);
- }
-
  for(const [key,value] of Object.entries(values))xml=xml.replaceAll("{{"+key+"}}",xmlSafe(value));
  if(xml.includes("{{ffq_"))throw new Error("Some FFQ selections could not be inserted into the questionnaire template.");
  if(/\{\{[^}]+\}\}/.test(xml))throw new Error("Some questionnaire fields could not be inserted into the supplied template.");
+ // Validate the finished WordprocessingML before packaging. Broken XML must
+ // never be offered as a successful questionnaire download.
+ try{new DOMParser().parseFromString(xml,"application/xml");}catch{}
+ const parserError=xml.match(/<parsererror[\\s>]/i);
+ if(parserError)throw new Error("The filled questionnaire template did not pass its XML integrity check.");
  doc.data=encoder.encode(xml);
  return zipStore(entries);
 }

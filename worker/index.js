@@ -73,6 +73,61 @@ function zipStore(files){
  const end=new Uint8Array(22),ev=new DataView(end.buffer);ev.setUint32(0,0x06054b50,true);ev.setUint16(4,0,true);ev.setUint16(6,0,true);ev.setUint16(8,files.length,true);ev.setUint16(10,files.length,true);ev.setUint32(12,centralSize,true);ev.setUint32(16,offset,true);ev.setUint16(20,0,true);
  const out=new Uint8Array(offset+centralSize+end.length);let pos=0;for(const part of [...locals,...centrals,end]){out.set(part,pos);pos+=part.length}return out;
 }
+async function unpackDocxTemplateBase64(base64){
+ const binary=atob(String(base64||"").trim()),bytes=new Uint8Array(binary.length);
+ for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+ const view=new DataView(bytes.buffer),decoder=new TextDecoder(),entries=[];
+ let offset=0;
+ while(offset+30<=bytes.length&&view.getUint32(offset,true)===0x04034b50){
+  const method=view.getUint16(offset+8,true),compressedSize=view.getUint32(offset+18,true),nameLength=view.getUint16(offset+26,true),extraLength=view.getUint16(offset+28,true);
+  const nameStart=offset+30,name=decoder.decode(bytes.subarray(nameStart,nameStart+nameLength)),dataStart=nameStart+nameLength+extraLength,dataEnd=dataStart+compressedSize;
+  if(dataEnd>bytes.length)throw new Error("The assessment template ZIP is incomplete.");
+  const compressed=bytes.slice(dataStart,dataEnd);let data;
+  if(method===0)data=compressed;
+  else if(method===8){
+   if(typeof DecompressionStream==="undefined")throw new Error("This runtime cannot expand the supplied Word template.");
+   const stream=new Blob([compressed]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+   data=new Uint8Array(await new Response(stream).arrayBuffer());
+  }else throw new Error("The assessment template uses an unsupported compression method.");
+  entries.push({name,data});offset=dataEnd;
+ }
+ if(!entries.some(x=>x.name==="word/document.xml"))throw new Error("The Word template is missing its main document.");
+ return entries;
+}
+async function makeQuestionnaireTemplateDocx(answers){
+ const templateResponse=await fetch("https://prachisayani.online/templates/nutrition-assessment-ffq-template.b64",{cache:"no-store"});
+ if(!templateResponse.ok)throw new Error("The supplied questionnaire template is temporarily unavailable.");
+ const base64=(await templateResponse.text()).trim();
+ if(!base64.startsWith("UEsDB"))throw new Error("The supplied questionnaire template could not be read.");
+ const entries=await unpackDocxTemplateBase64(base64),frequencyMap={Daily:"daily",Frequently:"frequently",Sometimes:"sometimes",Rarely:"rarely",Never:"never"};
+ const text=(v,fallback="Not provided")=>String(v??"").trim()||fallback;
+ const values={
+  full_name:text(answers.full_name),age:text(answers.age),gender:text(answers.gender),
+  occupation:text(answers.occupation),contact_number:text(answers.contact_number||answers.phone),
+  email:text(answers.email),address:text(answers.address),physical_activity:text(answers.physical_activity),
+  exercise_types:text(answers.exercise_types),exercise_duration:text(answers.exercise_duration),lifestyle:text(answers.lifestyle),
+  disease_status_and_details:text(answers.disease_status_and_details, text(answers.disease_status,"Not provided")+(answers.disease_details?": "+answers.disease_details:"")),
+  medication_status_and_details:text(answers.medication_status_and_details, text(answers.medication_status,"Not provided")+(answers.medication_details?": "+answers.medication_details:"")),
+  supplement_status_and_details:text(answers.supplement_status_and_details, text(answers.supplement_status,"Not provided")+(answers.supplement_details?": "+answers.supplement_details:"")),
+  height_cm:text(answers.height_cm)+" cm",weight_kg:text(answers.weight_kg)+" kg",bmi:text(answers.bmi),
+  waist_cm:text(answers.waist_cm)+" cm",hip_cm:text(answers.hip_cm)+" cm",
+  biochemical_parameters:text(answers.biochemical_parameters),hemoglobin:text(answers.hemoglobin),
+  fasting_blood_sugar:text(answers.fasting_blood_sugar),hba1c:text(answers.hba1c),
+  clinical_signs_symptoms:text(answers.clinical_signs_symptoms),interviewer_name:text(answers.interviewer_name),
+  score:text(answers.score,""),notes:text(answers.notes,"")
+ };
+ const ffq=answers.ffq&&typeof answers.ffq==="object"?answers.ffq:{};
+ for(let n=1;n<=35;n++){
+  const selected=frequencyMap[text(ffq[String(n)],"")];
+  for(const key of Object.values(frequencyMap))values["ffq_"+String(n).padStart(2,"0")+"_"+key]=selected===key?"X":"";
+ }
+ const doc=entries.find(x=>x.name==="word/document.xml"),decoder=new TextDecoder(),encoder=new TextEncoder();
+ let xml=decoder.decode(doc.data);
+ for(const [key,value] of Object.entries(values))xml=xml.replaceAll("{{"+key+"}}",xmlSafe(value));
+ if(/\{\{[^}]+\}\}/.test(xml))throw new Error("Some questionnaire fields could not be inserted into the supplied template.");
+ doc.data=encoder.encode(xml);
+ return zipStore(entries);
+}
 function makeAssessmentDocx(fullName,reference,submitted,fields){
  const para=(text,size=22,bold=false,color="26382D")=>'<w:p><w:pPr><w:spacing w:after="100"/></w:pPr><w:r><w:rPr><w:sz w:val="'+size+'"/>'+(bold?'<w:b/>':'')+'<w:color w:val="'+color+'"/></w:rPr><w:t xml:space="preserve">'+xmlSafe(text)+'</w:t></w:r></w:p>';
  const borders='<w:tblBorders><w:top w:val="single" w:sz="5" w:color="DCE5D8"/><w:left w:val="single" w:sz="5" w:color="DCE5D8"/><w:bottom w:val="single" w:sz="5" w:color="DCE5D8"/><w:right w:val="single" w:sz="5" w:color="DCE5D8"/><w:insideH w:val="single" w:sz="4" w:color="E7ECE4"/><w:insideV w:val="single" w:sz="4" w:color="E7ECE4"/></w:tblBorders>';
@@ -318,20 +373,14 @@ export default {
 
    const assessmentDoc=path.match(/^\/admin\/assessment-responses\/([a-f0-9-]+)\/document$/);
    if(assessmentDoc&&request.method==="GET"){
+    if(url.searchParams.get("format")&&url.searchParams.get("format")!=="docx")return json({success:false,message:"Only filled questionnaire Word documents are available for download."},400,headers);
     const row=await env.DB.prepare("SELECT id,full_name,email,phone,answers_json,calculated_json,created_at FROM assessment_responses WHERE id=?").bind(assessmentDoc[1]).first();
     if(!row)return json({success:false,message:"Assessment response not found."},404,headers);
-    let answers={},calculated={};try{answers=JSON.parse(row.answers_json||"{}")}catch{}try{calculated=JSON.parse(row.calculated_json||"{}")}catch{}
-    const fields=[
-     ["Full name",row.full_name],["Email address",row.email],["Mobile number",row.phone],["Consent to use information",answers.consent==="yes"?"Confirmed":"Not confirmed"],["Date of birth",answers.date_of_birth],["Sex (self-reported)",answers.sex],["Preferred name",answers.preferred_name],
-     ["Height",answers.height_cm?answers.height_cm+" cm":""],["Current weight",answers.weight_kg?answers.weight_kg+" kg":""],["Usual weight",answers.usual_weight_kg?answers.usual_weight_kg+" kg":""],["Usual weight time period",answers.weight_change_period],
-     ["Waist circumference",answers.waist_cm?answers.waist_cm+" cm":""],["Hip circumference",answers.hip_cm?answers.hip_cm+" cm":""],["Mid-upper arm circumference (MUAC)",answers.mid_upper_arm_cm?answers.mid_upper_arm_cm+" cm":""],["Calf circumference",answers.calf_cm?answers.calf_cm+" cm":""],["Skinfold status",answers.skinfold_status],["Skinfold sites / values",answers.skinfold_sites],["Other measurements / body composition",answers.other_measurements],
-     ["BMI (derived estimate)",calculated.bmi||""],["Waist-to-hip ratio (derived estimate)",calculated.whr||""],["Main goal",answers.main_goal],["Usual food pattern",answers.diet_pattern],["Relevant health conditions / concerns",answers.medical_context],["Food allergies / intolerances",answers.allergies],["Medicines / supplements",answers.medications],["Usual activity",answers.activity],["Sleep duration",answers.sleep],["Additional notes",answers.notes]
-    ].map(([k,v])=>[k,v===undefined||v===null||String(v)===""?"Not provided":String(v)]);
-    const submitted=new Date(row.created_at).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"});
-    const format=url.searchParams.get("format")==="docx"?"docx":"pdf";
-    const safeId=row.id.replace(/[^a-f0-9-]/g,"");
-    if(format==="docx")return new Response(makeAssessmentDocx(row.full_name,safeId,submitted,fields),{status:200,headers:{...headers,"Content-Type":"application/vnd.openxmlformats-officedocument.wordprocessingml.document","Content-Disposition":'attachment; filename="prachi-assessment-'+safeId+'.docx"'}});
-    return new Response(makeAssessmentPdf(row.full_name,safeId,submitted,fields),{status:200,headers:{...headers,"Content-Type":"application/pdf","Content-Disposition":'attachment; filename="prachi-assessment-'+safeId+'.pdf"'}});
+    let answers={};try{answers=JSON.parse(row.answers_json||"{}")}catch{}
+    try{
+     const document=await makeQuestionnaireTemplateDocx(answers),safeId=String(row.id).replace(/[^a-f0-9-]/g,"");
+     return new Response(document,{status:200,headers:{...headers,"Content-Type":"application/vnd.openxmlformats-officedocument.wordprocessingml.document","Content-Disposition":'attachment; filename="nutrition-assessment-'+safeId+'.docx"'}});
+    }catch(error){return json({success:false,message:error?.message||"The filled questionnaire document could not be generated."},503,headers);}
    }
    if(path==="/admin/theme"&&request.method==="POST"){const b=await body(request),color=String(b.primary_color||"").toUpperCase();if(!/^#[0-9A-F]{6}$/.test(color))return json({success:false,message:"Enter a valid six-digit HEX colour."},400,headers);await env.DB.prepare("CREATE TABLE IF NOT EXISTS platform_branding_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_by TEXT)").run();await env.DB.prepare("INSERT INTO platform_branding_settings(setting_key,setting_value,updated_at,updated_by) VALUES('primary_color',?,CURRENT_TIMESTAMP,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=CURRENT_TIMESTAMP,updated_by=excluded.updated_by").bind(color,session.user_id).run();await audit(env,session.user_id,null,"platform.branding.updated","branding","primary_color",{primary_color:color});return json({success:true,message:"Brand theme updated.",theme:{primary_color:color}},200,headers)}
    if(path==="/admin/module-controls"&&request.method==="GET"){

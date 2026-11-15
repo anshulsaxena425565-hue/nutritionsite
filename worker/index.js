@@ -73,6 +73,61 @@ function zipStore(files){
  const end=new Uint8Array(22),ev=new DataView(end.buffer);ev.setUint32(0,0x06054b50,true);ev.setUint16(4,0,true);ev.setUint16(6,0,true);ev.setUint16(8,files.length,true);ev.setUint16(10,files.length,true);ev.setUint32(12,centralSize,true);ev.setUint32(16,offset,true);ev.setUint16(20,0,true);
  const out=new Uint8Array(offset+centralSize+end.length);let pos=0;for(const part of [...locals,...centrals,end]){out.set(part,pos);pos+=part.length}return out;
 }
+async function unpackDocxTemplateBase64(base64){
+ const binary=atob(String(base64||"").trim()),bytes=new Uint8Array(binary.length);
+ for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+ const view=new DataView(bytes.buffer),decoder=new TextDecoder(),entries=[];
+ let offset=0;
+ while(offset+30<=bytes.length&&view.getUint32(offset,true)===0x04034b50){
+  const method=view.getUint16(offset+8,true),compressedSize=view.getUint32(offset+18,true),nameLength=view.getUint16(offset+26,true),extraLength=view.getUint16(offset+28,true);
+  const nameStart=offset+30,name=decoder.decode(bytes.subarray(nameStart,nameStart+nameLength)),dataStart=nameStart+nameLength+extraLength,dataEnd=dataStart+compressedSize;
+  if(dataEnd>bytes.length)throw new Error("The assessment template ZIP is incomplete.");
+  const compressed=bytes.slice(dataStart,dataEnd);let data;
+  if(method===0)data=compressed;
+  else if(method===8){
+   if(typeof DecompressionStream==="undefined")throw new Error("This runtime cannot expand the supplied Word template.");
+   const stream=new Blob([compressed]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+   data=new Uint8Array(await new Response(stream).arrayBuffer());
+  }else throw new Error("The assessment template uses an unsupported compression method.");
+  entries.push({name,data});offset=dataEnd;
+ }
+ if(!entries.some(x=>x.name==="word/document.xml"))throw new Error("The Word template is missing its main document.");
+ return entries;
+}
+async function makeQuestionnaireTemplateDocx(answers){
+ const templateResponse=await fetch("https://prachisayani.online/templates/nutrition-assessment-ffq-template.b64",{cache:"no-store"});
+ if(!templateResponse.ok)throw new Error("The supplied questionnaire template is temporarily unavailable.");
+ const base64=(await templateResponse.text()).trim();
+ if(!base64.startsWith("UEsDB"))throw new Error("The supplied questionnaire template could not be read.");
+ const entries=await unpackDocxTemplateBase64(base64),frequencyMap={Daily:"daily",Frequently:"frequently",Sometimes:"sometimes",Rarely:"rarely",Never:"never"};
+ const text=(v,fallback="Not provided")=>String(v??"").trim()||fallback;
+ const values={
+  full_name:text(answers.full_name),age:text(answers.age),gender:text(answers.gender),
+  occupation:text(answers.occupation),contact_number:text(answers.contact_number||answers.phone),
+  email:text(answers.email),address:text(answers.address),physical_activity:text(answers.physical_activity),
+  exercise_types:text(answers.exercise_types),exercise_duration:text(answers.exercise_duration),lifestyle:text(answers.lifestyle),
+  disease_status_and_details:text(answers.disease_status_and_details, text(answers.disease_status,"Not provided")+(answers.disease_details?": "+answers.disease_details:"")),
+  medication_status_and_details:text(answers.medication_status_and_details, text(answers.medication_status,"Not provided")+(answers.medication_details?": "+answers.medication_details:"")),
+  supplement_status_and_details:text(answers.supplement_status_and_details, text(answers.supplement_status,"Not provided")+(answers.supplement_details?": "+answers.supplement_details:"")),
+  height_cm:text(answers.height_cm)+" cm",weight_kg:text(answers.weight_kg)+" kg",bmi:text(answers.bmi),
+  waist_cm:text(answers.waist_cm)+" cm",hip_cm:text(answers.hip_cm)+" cm",
+  biochemical_parameters:text(answers.biochemical_parameters),hemoglobin:text(answers.hemoglobin),
+  fasting_blood_sugar:text(answers.fasting_blood_sugar),hba1c:text(answers.hba1c),
+  clinical_signs_symptoms:text(answers.clinical_signs_symptoms),interviewer_name:text(answers.interviewer_name),
+  score:text(answers.score,""),notes:text(answers.notes,"")
+ };
+ const ffq=answers.ffq&&typeof answers.ffq==="object"?answers.ffq:{};
+ for(let n=1;n<=35;n++){
+  const selected=frequencyMap[text(ffq[String(n)],"")];
+  for(const key of Object.values(frequencyMap))values["ffq_"+String(n).padStart(2,"0")+"_"+key]=selected===key?"X":"";
+ }
+ const doc=entries.find(x=>x.name==="word/document.xml"),decoder=new TextDecoder(),encoder=new TextEncoder();
+ let xml=decoder.decode(doc.data);
+ for(const [key,value] of Object.entries(values))xml=xml.replaceAll("{{"+key+"}}",xmlSafe(value));
+ if(/\{\{[^}]+\}\}/.test(xml))throw new Error("Some questionnaire fields could not be inserted into the supplied template.");
+ doc.data=encoder.encode(xml);
+ return zipStore(entries);
+}
 function makeAssessmentDocx(fullName,reference,submitted,fields){
  const para=(text,size=22,bold=false,color="26382D")=>'<w:p><w:pPr><w:spacing w:after="100"/></w:pPr><w:r><w:rPr><w:sz w:val="'+size+'"/>'+(bold?'<w:b/>':'')+'<w:color w:val="'+color+'"/></w:rPr><w:t xml:space="preserve">'+xmlSafe(text)+'</w:t></w:r></w:p>';
  const borders='<w:tblBorders><w:top w:val="single" w:sz="5" w:color="DCE5D8"/><w:left w:val="single" w:sz="5" w:color="DCE5D8"/><w:bottom w:val="single" w:sz="5" w:color="DCE5D8"/><w:right w:val="single" w:sz="5" w:color="DCE5D8"/><w:insideH w:val="single" w:sz="4" w:color="E7ECE4"/><w:insideV w:val="single" w:sz="4" w:color="E7ECE4"/></w:tblBorders>';
@@ -124,20 +179,58 @@ export default {
    }
 
    if(path==="/public/assessment-responses"&&request.method==="POST"){
-    const b=await body(request),answers=b.answers&&typeof b.answers==="object"&&!Array.isArray(b.answers)?b.answers:{},fullName=clean(answers.full_name,120),email=clean(answers.email,254).toLowerCase(),phone=clean(answers.phone,40);
-    if(clean(b.website||answers.website,200))return json({success:true,message:"Assessment received."},200,headers);
+    const b=await body(request),raw=b.answers&&typeof b.answers==="object"&&!Array.isArray(b.answers)?b.answers:{};
+    if(clean(b.website||raw.website,200))return json({success:true,message:"Assessment received."},200,headers);
+    const answers={...raw};
+    const fullName=clean(raw.full_name,120),email=clean(raw.email,254).toLowerCase(),phone=clean(raw.contact_number||raw.phone,40);
     if(fullName.length<2||!emailOk(email))return json({success:false,message:"Please provide your name and a valid email address."},400,headers);
-    if(answers.consent!=="yes")return json({success:false,message:"Please confirm the privacy notice before submitting."},400,headers);
-    const numericKeys=["height_cm","weight_kg","usual_weight_kg","waist_cm","hip_cm","mid_upper_arm_cm","calf_cm"];
-    for(const key of numericKeys){const value=answers[key];if(value!==undefined&&value!==""&&(!Number.isFinite(Number(value))||Number(value)<=0||Number(value)>500))return json({success:false,message:"Check the measurement entered for "+key.replace(/_/g," ")+". Values must be positive and within a plausible entry range."},400,headers);}
+    if(raw.consent!=="yes")return json({success:false,message:"Please confirm the privacy notice before submitting."},400,headers);
+    const required=["age","gender","occupation","contact_number","address","physical_activity","exercise_types","exercise_duration","lifestyle","disease_status","medication_status","supplement_status","height_cm","weight_kg","waist_cm","hip_cm","biochemical_parameters","interviewer_name"];
+    const missing=required.filter(k=>raw[k]===undefined||raw[k]===null||String(raw[k]).trim()==="");
+    if(missing.length)return json({success:false,message:"Please complete all required questionnaire fields: "+missing.join(", ")+"."},400,headers);
+    if(!Number.isInteger(Number(raw.age))||Number(raw.age)<1||Number(raw.age)>120)return json({success:false,message:"Enter a valid age between 1 and 120 years."},400,headers);
+    if(!["Female","Male"].includes(String(raw.gender)))return json({success:false,message:"Please choose Female or Male for gender."},400,headers);
+    if(!["Daily","Thrice a week","Never"].includes(String(raw.physical_activity)))return json({success:false,message:"Please choose a valid physical activity frequency."},400,headers);
+    if(!["Sedentary","Moderate","Heavy work"].includes(String(raw.lifestyle)))return json({success:false,message:"Please choose a valid lifestyle option."},400,headers);
+    if(!["Yes","No","Other"].includes(String(raw.disease_status))||!["Yes","No","Other"].includes(String(raw.medication_status))||!["Yes","No","Other"].includes(String(raw.supplement_status)))return json({success:false,message:"Please answer each health history question."},400,headers);
+    if(!["Yes","No"].includes(String(raw.biochemical_parameters)))return json({success:false,message:"Please select Yes or No for biochemical parameters."},400,headers);
+    const ranges={height_cm:[50,250],weight_kg:[10,500],waist_cm:[30,250],hip_cm:[40,250]};
+    for(const [key,[min,max]] of Object.entries(ranges)){const value=Number(raw[key]);if(!Number.isFinite(value)||value<min||value>max)return json({success:false,message:"Enter a valid "+key.replace(/_/g," ")+" between "+min+" and "+max+"."},400,headers);}
+    const exercise=clean(raw.exercise_types,200);
+    if(!exercise)return json({success:false,message:"Choose at least one type of exercise."},400,headers);
+    const interviewer=clean(raw.interviewer_name,120);
+    const ffq=raw.ffq&&typeof raw.ffq==="object"&&!Array.isArray(raw.ffq)?raw.ffq:{};
+    const allowedFrequency=new Set(["Daily","Frequently","Sometimes","Rarely","Never"]);
+    const cleanFfq={};
+    for(let n=1;n<=35;n++){const value=String(ffq[String(n)]||"");if(!allowedFrequency.has(value))return json({success:false,message:"Please select a frequency for FFQ food item "+n+"."},400,headers);cleanFfq[String(n)]=value;}
+    const safeAnswers={
+     full_name:fullName,age:String(Number(raw.age)),gender:String(raw.gender),occupation:clean(raw.occupation,120),
+     contact_number:phone,email,address:clean(raw.address,500),physical_activity:String(raw.physical_activity),
+     exercise_types:exercise,exercise_duration:clean(raw.exercise_duration,100),lifestyle:String(raw.lifestyle),
+     disease_status:String(raw.disease_status),disease_details:clean(raw.disease_details,500),
+     medication_status:String(raw.medication_status),medication_details:clean(raw.medication_details,500),
+     supplement_status:String(raw.supplement_status),supplement_details:clean(raw.supplement_details,500),
+     height_cm:String(Number(raw.height_cm)),weight_kg:String(Number(raw.weight_kg)),
+     waist_cm:String(Number(raw.waist_cm)),hip_cm:String(Number(raw.hip_cm)),
+     biochemical_parameters:String(raw.biochemical_parameters),hemoglobin:clean(raw.hemoglobin,60),
+     fasting_blood_sugar:clean(raw.fasting_blood_sugar,60),hba1c:clean(raw.hba1c,60),
+     clinical_signs_symptoms:clean(raw.clinical_signs_symptoms,1000),interviewer_name:interviewer,
+     score:clean(raw.score,80),notes:clean(raw.notes,2000),ffq:cleanFfq,consent:"yes"
+    };
+    safeAnswers.exercise_types=safeAnswers.exercise_types.replace(/\s+/g," ").trim();
+    safeAnswers.disease_status_and_details=safeAnswers.disease_status+(safeAnswers.disease_details?": "+safeAnswers.disease_details:"");
+    safeAnswers.medication_status_and_details=safeAnswers.medication_status+(safeAnswers.medication_details?": "+safeAnswers.medication_details:"");
+    safeAnswers.supplement_status_and_details=safeAnswers.supplement_status+(safeAnswers.supplement_details?": "+safeAnswers.supplement_details:"");
+    const bmi=(Number(safeAnswers.weight_kg)/((Number(safeAnswers.height_cm)/100)**2)).toFixed(1);
+    safeAnswers.bmi=bmi+" kg/m²";
     const clientIp=request.headers.get("CF-Connecting-IP")||"unknown",ipHash=await hash(clientIp),stamp=now();
     const attempt=await env.DB.prepare("INSERT INTO assessment_submission_limits(ip_hash,window_started_at,request_count) VALUES(?,?,1) ON CONFLICT(ip_hash) DO UPDATE SET request_count=CASE WHEN julianday('now')-julianday(assessment_submission_limits.window_started_at)>15.0/1440.0 THEN 1 ELSE assessment_submission_limits.request_count+1 END,window_started_at=CASE WHEN julianday('now')-julianday(assessment_submission_limits.window_started_at)>15.0/1440.0 THEN excluded.window_started_at ELSE assessment_submission_limits.window_started_at END RETURNING request_count").bind(ipHash,stamp).first();
     if(Number(attempt?.request_count||0)>5)return json({success:false,message:"Too many submissions from this connection. Please try again in about 15 minutes."},429,headers);
-    const safeAnswers={...answers};delete safeAnswers.website;
     const responseId=id();
-    await env.DB.prepare("INSERT INTO assessment_responses(id,full_name,email,phone,answers_json,calculated_json,created_at) VALUES(?,?,?,?,?,?,?)").bind(responseId,fullName,email,phone,JSON.stringify(safeAnswers),JSON.stringify(b.calculated||{}),stamp).run();
-    return json({success:true,message:"Your assessment has been received.",reference:responseId},201,headers);
+    await env.DB.prepare("INSERT INTO assessment_responses(id,full_name,email,phone,answers_json,calculated_json,created_at) VALUES(?,?,?,?,?,?,?)").bind(responseId,fullName,email,phone,JSON.stringify(safeAnswers),JSON.stringify({bmi}),stamp).run();
+    return json({success:true,message:"Your questionnaire has been received.",reference:responseId},201,headers);
    }
+
    if (path === "/auth/register" && request.method === "POST") {
     const b=await body(request),name=clean(b.full_name,120),email=clean(b.email,254).toLowerCase(),phone=clean(b.mobile,24).replace(/[\\s()+.-]/g,""),password=b.password,accountType=b.account_type==="dietitian"?"dietitian":"client";
     if(name.length<2||!emailOk(email)||!/^[0-9]{7,15}$/.test(phone)||!validPassword(password))
@@ -280,20 +373,14 @@ export default {
 
    const assessmentDoc=path.match(/^\/admin\/assessment-responses\/([a-f0-9-]+)\/document$/);
    if(assessmentDoc&&request.method==="GET"){
+    if(url.searchParams.get("format")&&url.searchParams.get("format")!=="docx")return json({success:false,message:"Only filled questionnaire Word documents are available for download."},400,headers);
     const row=await env.DB.prepare("SELECT id,full_name,email,phone,answers_json,calculated_json,created_at FROM assessment_responses WHERE id=?").bind(assessmentDoc[1]).first();
     if(!row)return json({success:false,message:"Assessment response not found."},404,headers);
-    let answers={},calculated={};try{answers=JSON.parse(row.answers_json||"{}")}catch{}try{calculated=JSON.parse(row.calculated_json||"{}")}catch{}
-    const fields=[
-     ["Full name",row.full_name],["Email address",row.email],["Mobile number",row.phone],["Consent to use information",answers.consent==="yes"?"Confirmed":"Not confirmed"],["Date of birth",answers.date_of_birth],["Sex (self-reported)",answers.sex],["Preferred name",answers.preferred_name],
-     ["Height",answers.height_cm?answers.height_cm+" cm":""],["Current weight",answers.weight_kg?answers.weight_kg+" kg":""],["Usual weight",answers.usual_weight_kg?answers.usual_weight_kg+" kg":""],["Usual weight time period",answers.weight_change_period],
-     ["Waist circumference",answers.waist_cm?answers.waist_cm+" cm":""],["Hip circumference",answers.hip_cm?answers.hip_cm+" cm":""],["Mid-upper arm circumference (MUAC)",answers.mid_upper_arm_cm?answers.mid_upper_arm_cm+" cm":""],["Calf circumference",answers.calf_cm?answers.calf_cm+" cm":""],["Skinfold status",answers.skinfold_status],["Skinfold sites / values",answers.skinfold_sites],["Other measurements / body composition",answers.other_measurements],
-     ["BMI (derived estimate)",calculated.bmi||""],["Waist-to-hip ratio (derived estimate)",calculated.whr||""],["Main goal",answers.main_goal],["Usual food pattern",answers.diet_pattern],["Relevant health conditions / concerns",answers.medical_context],["Food allergies / intolerances",answers.allergies],["Medicines / supplements",answers.medications],["Usual activity",answers.activity],["Sleep duration",answers.sleep],["Additional notes",answers.notes]
-    ].map(([k,v])=>[k,v===undefined||v===null||String(v)===""?"Not provided":String(v)]);
-    const submitted=new Date(row.created_at).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"});
-    const format=url.searchParams.get("format")==="docx"?"docx":"pdf";
-    const safeId=row.id.replace(/[^a-f0-9-]/g,"");
-    if(format==="docx")return new Response(makeAssessmentDocx(row.full_name,safeId,submitted,fields),{status:200,headers:{...headers,"Content-Type":"application/vnd.openxmlformats-officedocument.wordprocessingml.document","Content-Disposition":'attachment; filename="prachi-assessment-'+safeId+'.docx"'}});
-    return new Response(makeAssessmentPdf(row.full_name,safeId,submitted,fields),{status:200,headers:{...headers,"Content-Type":"application/pdf","Content-Disposition":'attachment; filename="prachi-assessment-'+safeId+'.pdf"'}});
+    let answers={};try{answers=JSON.parse(row.answers_json||"{}")}catch{}
+    try{
+     const document=await makeQuestionnaireTemplateDocx(answers),safeId=String(row.id).replace(/[^a-f0-9-]/g,"");
+     return new Response(document,{status:200,headers:{...headers,"Content-Type":"application/vnd.openxmlformats-officedocument.wordprocessingml.document","Content-Disposition":'attachment; filename="nutrition-assessment-'+safeId+'.docx"'}});
+    }catch(error){return json({success:false,message:error?.message||"The filled questionnaire document could not be generated."},503,headers);}
    }
    if(path==="/admin/theme"&&request.method==="POST"){const b=await body(request),color=String(b.primary_color||"").toUpperCase();if(!/^#[0-9A-F]{6}$/.test(color))return json({success:false,message:"Enter a valid six-digit HEX colour."},400,headers);await env.DB.prepare("CREATE TABLE IF NOT EXISTS platform_branding_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_by TEXT)").run();await env.DB.prepare("INSERT INTO platform_branding_settings(setting_key,setting_value,updated_at,updated_by) VALUES('primary_color',?,CURRENT_TIMESTAMP,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=CURRENT_TIMESTAMP,updated_by=excluded.updated_by").bind(color,session.user_id).run();await audit(env,session.user_id,null,"platform.branding.updated","branding","primary_color",{primary_color:color});return json({success:true,message:"Brand theme updated.",theme:{primary_color:color}},200,headers)}
    if(path==="/admin/module-controls"&&request.method==="GET"){

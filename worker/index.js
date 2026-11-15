@@ -80,6 +80,17 @@ export default {
     await env.DB.prepare("INSERT INTO enquiries(id,name,email,phone,service,preferred_contact,goal,preferred_start,message,status,source) VALUES(?,?,?,?,?,?,?,?,?,'new',?)").bind(ref,name,email,clean(b.phone||b.jPhone,40),clean(b.service||b.service_name||b.journeyServiceName,160),clean(b.preferred_contact||b.jFormat,40),clean(b.goal||b.jGoal,1000),clean(b.preferred_start||b.jTimeline,120),clean(b.message||b.jContext,3000),"website").run();
     return json({success:true,message:"Thank you. Your enquiry has been received.",reference:ref},200,headers);
    }
+
+   if(path==="/public/assessment-responses"&&request.method==="POST"){
+    const b=await body(request),answers=b.answers&&typeof b.answers==="object"&&!Array.isArray(b.answers)?b.answers:{},fullName=clean(answers.full_name,120),email=clean(answers.email,254).toLowerCase(),phone=clean(answers.phone,40);
+    if(clean(b.website,200))return json({success:true,message:"Assessment received."},200,headers);
+    if(fullName.length<2||!emailOk(email))return json({success:false,message:"Please provide your name and a valid email address."},400,headers);
+    const numericKeys=["height_cm","weight_kg","usual_weight_kg","waist_cm","hip_cm","mid_upper_arm_cm","calf_cm"];
+    for(const key of numericKeys){const value=answers[key];if(value!==undefined&&value!==""&&(!Number.isFinite(Number(value))||Number(value)<=0||Number(value)>500))return json({success:false,message:"Check the measurement entered for "+key.replace(/_/g," ")+". Values must be positive and within a plausible entry range."},400,headers);}
+    const responseId=id(),stamp=now();
+    await env.DB.prepare("INSERT INTO assessment_responses(id,full_name,email,phone,answers_json,calculated_json,created_at) VALUES(?,?,?,?,?,?,?)").bind(responseId,fullName,email,phone,JSON.stringify(answers),JSON.stringify(b.calculated||{}),stamp).run();
+    return json({success:true,message:"Your assessment has been received.",reference:responseId},201,headers);
+   }
    if (path === "/auth/register" && request.method === "POST") {
     const b=await body(request),name=clean(b.full_name,120),email=clean(b.email,254).toLowerCase(),phone=clean(b.mobile,24).replace(/[\\s()+.-]/g,""),password=b.password,accountType=b.account_type==="dietitian"?"dietitian":"client";
     if(name.length<2||!emailOk(email)||!/^[0-9]{7,15}$/.test(phone)||!validPassword(password))
@@ -214,6 +225,24 @@ export default {
     if(!session?.is_platform_admin) return json({success:false,message:"Platform administrator access required."},session?403:401,headers);
  
 
+
+   if(path==="/admin/assessment-responses"&&request.method==="GET"){
+    const rows=await env.DB.prepare("SELECT id,full_name,email,phone,answers_json,calculated_json,created_at FROM assessment_responses ORDER BY created_at DESC LIMIT 1000").all();
+    const responses=(rows.results||[]).map(r=>{let answers={},calculated={};try{answers=JSON.parse(r.answers_json||"{}")}catch{}try{calculated=JSON.parse(r.calculated_json||"{}")}catch{}return {...r,answers,calculated}});return json({success:true,responses},200,headers);
+   }
+   const assessmentDoc=path.match(/^\/admin\/assessment-responses\/([a-f0-9-]+)\/document$/);
+   if(assessmentDoc&&request.method==="GET"){
+    const row=await env.DB.prepare("SELECT id,full_name,email,phone,answers_json,calculated_json,created_at FROM assessment_responses WHERE id=?").bind(assessmentDoc[1]).first();
+    if(!row)return json({success:false,message:"Assessment response not found."},404,headers);
+    let answers={},calculated={};try{answers=JSON.parse(row.answers_json||"{}")}catch{}try{calculated=JSON.parse(row.calculated_json||"{}")}catch{}
+    const format=url.searchParams.get("format")==="docx"?"docx":"pdf";
+    const fields=[["Full name",row.full_name],["Email",row.email],["Phone",row.phone],["Date of birth",answers.date_of_birth],["Sex (self-reported)",answers.sex],["Height",answers.height_cm?answers.height_cm+" cm":""],["Current weight",answers.weight_kg?answers.weight_kg+" kg":""],["Usual weight",answers.usual_weight_kg?answers.usual_weight_kg+" kg":""],["Waist circumference",answers.waist_cm?answers.waist_cm+" cm":""],["Hip circumference",answers.hip_cm?answers.hip_cm+" cm":""],["MUAC",answers.mid_upper_arm_cm?answers.mid_upper_arm_cm+" cm":""],["Calf circumference",answers.calf_cm?answers.calf_cm+" cm":""],["BMI (derived estimate)",calculated.bmi||""],["Waist-to-hip ratio (derived estimate)",calculated.whr||""],["Main goal",answers.main_goal],["Usual food pattern",answers.diet_pattern],["Food allergies / intolerances",answers.allergies],["Health context",answers.medical_context],["Medicines / supplements",answers.medications],["Usual activity",answers.activity],["Additional notes",answers.notes]];
+    const escapeHtml=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+    const rowsHtml=fields.filter(([,v])=>v!==undefined&&v!==null&&String(v)!=="").map(([k,v])=>"<tr><th>"+escapeHtml(k)+"</th><td>"+escapeHtml(v)+"</td></tr>").join("");
+    const html="<!doctype html><html><head><meta charset=\"utf-8\"><style>body{font:12px Arial,sans-serif;color:#26372c;margin:38px}header{border-bottom:3px solid #66836b;padding-bottom:14px;margin-bottom:24px}h1{font:600 23px Georgia;margin:0 0 5px}p{color:#68786b;font-size:11px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #e0e6de;padding:9px;text-align:left;vertical-align:top}th{width:32%;background:#f1f5ee;color:#526b53}footer{margin-top:24px;border-top:1px solid #e0e6de;padding-top:12px;color:#7b887d;font-size:10px}.note{background:#f5f7f2;padding:10px;margin-top:18px}</style></head><body><header><h1>Prachi Sayani · Nutrition Intake Assessment</h1><p>CONFIDENTIAL · Patient-reported intake · Submitted "+escapeHtml(new Date(row.created_at).toLocaleString("en-IN"))+"</p></header><table>"+rowsHtml+"</table><div class=\"note\">This document records information supplied through the intake form. Derived values are estimates and must be reviewed in context. This document is not a diagnosis or a substitute for clinical assessment.</div><footer>Prachi Nutrition · Confidential patient information · Reference "+escapeHtml(row.id)+"</footer></body></html>";
+    if(format==="docx")return new Response(html,{status:200,headers:{...headers,"Content-Type":"application/msword; charset=utf-8","Content-Disposition":"attachment; filename=\"prachi-assessment-"+row.id+".doc\"}});
+    return new Response(html,{status:200,headers:{...headers,"Content-Type":"text/html; charset=utf-8","Content-Disposition":"attachment; filename=\"prachi-assessment-"+row.id+".html\"}});
+   }
    if(path==="/admin/theme"&&request.method==="POST"){const b=await body(request),color=String(b.primary_color||"").toUpperCase();if(!/^#[0-9A-F]{6}$/.test(color))return json({success:false,message:"Enter a valid six-digit HEX colour."},400,headers);await env.DB.prepare("CREATE TABLE IF NOT EXISTS platform_branding_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_by TEXT)").run();await env.DB.prepare("INSERT INTO platform_branding_settings(setting_key,setting_value,updated_at,updated_by) VALUES('primary_color',?,CURRENT_TIMESTAMP,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=CURRENT_TIMESTAMP,updated_by=excluded.updated_by").bind(color,session.user_id).run();await audit(env,session.user_id,null,"platform.branding.updated","branding","primary_color",{primary_color:color});return json({success:true,message:"Brand theme updated.",theme:{primary_color:color}},200,headers)}
    if(path==="/admin/module-controls"&&request.method==="GET"){
     const moduleInfo={

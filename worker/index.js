@@ -130,11 +130,6 @@ async function makeQuestionnaireTemplateDocx(answers){
  for(const [key,value] of Object.entries(values))xml=xml.replaceAll("{{"+key+"}}",xmlSafe(value));
  if(xml.includes("{{ffq_"))throw new Error("Some FFQ selections could not be inserted into the questionnaire template.");
  if(/\{\{[^}]+\}\}/.test(xml))throw new Error("Some questionnaire fields could not be inserted into the supplied template.");
- // Validate the finished WordprocessingML before packaging. Broken XML must
- // never be offered as a successful questionnaire download.
- try{new DOMParser().parseFromString(xml,"application/xml");}catch{}
- const parserError=xml.match(/<parsererror[\\s>]/i);
- if(parserError)throw new Error("The filled questionnaire template did not pass its XML integrity check.");
  doc.data=encoder.encode(xml);
  return zipStore(entries);
 }

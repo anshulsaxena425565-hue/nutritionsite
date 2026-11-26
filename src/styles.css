@@ -1434,3 +1434,64 @@ td b{color:#2e3a54}
 .assessment-response-ffq-grid b{color:#315a45}
 .assessment-response-note{font-size:10px;color:#8a9586;padding:2px 4px}
 @media(max-width:720px){.assessment-response-group>div:not(.assessment-response-ffq-grid){grid-template-columns:1fr;gap:3px}.assessment-response-ffq-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.assessment-admin-actions button{white-space:normal}}
+
+
+/* Client portal readability and refreshed overview / meal plan cards */
+.client-account-panel .patient-day-pulse{padding:24px 26px;border:1px solid #dcdff5;border-radius:22px;background:linear-gradient(135deg,#f7f6ff 0%,#fff 58%,#f0faf6 100%);box-shadow:0 12px 32px rgba(45,48,108,.08)}
+.client-account-panel .patient-pulse-heading{margin-bottom:18px}
+.client-account-panel .patient-pulse-heading h3{font-size:22px;color:#20264a;margin-top:7px}
+.client-account-panel .patient-pulse-heading .patient-eyebrow{font-size:14px;letter-spacing:1px}
+.client-account-panel .patient-pulse-note{font-size:14px;color:#606987;font-weight:650}
+.client-account-panel .patient-pulse-grid{gap:14px}
+.client-account-panel .patient-pulse-item{padding:16px;border:1px solid #e3e6f2;border-radius:17px;background:rgba(255,255,255,.88);gap:13px;min-height:82px}
+.client-account-panel .patient-pulse-item>div b{font-size:24px;color:#252b50}
+.client-account-panel .patient-pulse-item>div small{font-size:14px;color:#59627e;white-space:normal}
+.client-account-panel .patient-pulse-status{font-size:14px;color:#505b7a}
+.client-account-panel .pulse-icon{width:42px;height:42px;flex-basis:42px;border-radius:14px}
+.client-account-panel .patient-connection-copy small{font-size:14px}
+.client-account-panel .patient-connection-copy b{font-size:17px}
+.client-account-panel .patient-connection-copy span{font-size:14px}
+.client-account-panel .patient-task-heading p,.client-account-panel .patient-task-copy p,.client-account-panel .patient-task-copy small,.client-account-panel .patient-task-actions select{font-size:14px}
+.client-account-panel .patient-quick-card b{font-size:16px}
+.client-account-panel .patient-quick-card>small,.client-account-panel .patient-water-actions button{font-size:14px}
+.client-account-panel .patient-today-list b,.client-account-panel .patient-today-list p,.client-account-panel .patient-today-list small,.client-account-panel .patient-empty p,.client-account-panel .patient-empty button,.client-account-panel .patient-text-link{font-size:14px}
+.client-account-panel .patient-privacy-note{font-size:14px}
+.client-account-panel .panel-head h3{font-size:18px}
+.client-account-panel .panel-head p{font-size:14px}
+.client-account-panel .care-tabs b,.client-account-panel .care-tabs small{font-size:14px}
+.client-account-panel .care-tabs button{min-height:76px}
+.client-account-panel .care-plan-heading h3{font-size:19px}
+.client-account-panel .care-plan-heading p,.client-account-panel .care-plan-notes{font-size:14px}
+.client-account-panel .macro-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.client-account-panel .macro-grid .metric{padding:16px;border:1px solid #e8e9f5;border-radius:15px;background:linear-gradient(145deg,#fff,#f8f8ff)}
+.client-account-panel .macro-grid .metric small{font-size:14px;color:#69718c}
+.client-account-panel .macro-grid .metric b{font-size:20px;color:#293052}
+.client-meal-section{margin-top:8px}
+.client-meal-section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0 13px}
+.client-meal-section-heading h4{font-size:20px;margin:4px 0 0;color:#252b4d}
+.client-meal-kicker{font-size:14px;font-weight:800;letter-spacing:1px;color:#6b61cb}
+.client-meal-count{padding:8px 12px;border-radius:999px;background:#f0efff;color:#554cc4;font-size:14px;font-weight:750}
+.client-meal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.client-meal-card{min-width:0;padding:17px;border:1px solid #e7e9f3;border-radius:17px;background:linear-gradient(145deg,#fff 0%,#fbfbff 100%);box-shadow:0 5px 16px rgba(39,45,93,.035)}
+.client-meal-card-head{display:flex;align-items:center;gap:12px;padding-bottom:13px;border-bottom:1px solid #eceef5}
+.client-meal-card-head>div{display:grid;gap:4px;flex:1;min-width:0}
+.client-meal-card-head>b,.client-meal-card-head div>b{font-size:17px;color:#303654}
+.client-meal-card-head small{font-size:14px;color:#727b97}
+.client-meal-card-head>svg{color:#6a61cc}
+.client-meal-index{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:#f0efff;color:#5e55c8;font-size:14px;font-weight:850}
+.client-meal-foods{padding-top:12px}
+.client-meal-foods p{margin:0;color:#515b78;font-size:15px;line-height:1.7;white-space:pre-wrap}
+.client-meal-foods ul{margin:0;padding-left:21px;display:grid;gap:8px}
+.client-meal-foods li{padding-left:3px;color:#515b78;font-size:15px;line-height:1.6}
+.client-meal-foods li::marker{color:#6a61cc}
+.client-account-panel .nav-item{font-size:14px}
+.client-account-panel .nav-item.selected{background:#eeedff!important;color:#4e45c4!important;border-color:#dcd9ff!important;box-shadow:inset 3px 0 0 #655bd2}
+.client-account-panel .nav-item.selected svg{color:#554cc8}
+@media(max-width:700px){
+ .client-account-panel .patient-day-pulse{padding:18px 14px}
+ .client-account-panel .patient-pulse-grid{grid-template-columns:1fr;gap:9px}
+ .client-account-panel .patient-pulse-item{display:flex;padding:13px}
+ .client-account-panel .patient-pulse-status{margin-left:auto}
+ .client-meal-grid{grid-template-columns:1fr}
+ .client-account-panel .macro-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}

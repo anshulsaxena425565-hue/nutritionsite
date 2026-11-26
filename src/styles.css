@@ -1495,3 +1495,6 @@ td b{color:#2e3a54}
  .client-meal-grid{grid-template-columns:1fr}
  .client-account-panel .macro-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+/* Hard readability floor across the client account panel: no supporting text below 14px. */
+.client-account-panel :where(p,small,label,button,input,select,textarea,td,th,a,li,span,b,strong,em,code,time,summary,dt,dd,legend){font-size:max(14px,1em)}

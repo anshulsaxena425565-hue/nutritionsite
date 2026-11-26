@@ -390,8 +390,12 @@ export default {
     if(!ticket)return json({success:false,message:"Support ticket not found."},404,headers);
     if(ticket.requester_user_id!==session.user_id&&!session.is_platform_admin)return json({success:false,message:"You do not have access to this ticket."},403,headers);
     if(request.method==="GET"){
-     const rows=await env.DB.prepare("SELECT m.id,m.sender_user_id,m.sender_role,m.body,m.created_at,u.display_name AS sender_name FROM support_ticket_messages m JOIN app_users u ON u.id=m.sender_user_id WHERE m.ticket_id=? ORDER BY m.created_at ASC LIMIT 500").bind(ticket.id).all();
-     return json({success:true,messages:rows.results||[]},200,headers);
+     const params=new URL(request.url).searchParams;
+     const page=Math.max(1,Math.min(100000,Number(params.get("page"))||1));
+     const pageSize=Math.max(10,Math.min(100,Number(params.get("pageSize"))||500));
+     const totalRow=await env.DB.prepare("SELECT COUNT(*) AS total FROM support_ticket_messages WHERE ticket_id=?").bind(ticket.id).first();
+     const rows=await env.DB.prepare("SELECT m.id,m.sender_user_id,m.sender_role,m.body,m.created_at,u.display_name AS sender_name FROM support_ticket_messages m JOIN app_users u ON u.id=m.sender_user_id WHERE m.ticket_id=? ORDER BY m.created_at DESC LIMIT ? OFFSET ?").bind(ticket.id,pageSize,(page-1)*pageSize).all();
+     return json({success:true,messages:(rows.results||[]).reverse(),total:Number(totalRow?.total||0),page,pageSize,totalPages:Math.max(1,Math.ceil(Number(totalRow?.total||0)/pageSize))},200,headers);
     }
     const b=await body(request),message=clean(b.message,5000);
     if(message.length<1)return json({success:false,message:"Write a message before sending."},400,headers);
@@ -406,8 +410,22 @@ export default {
     if(!session?.is_platform_admin) return json({success:false,message:"Platform administrator access required."},session?403:401,headers);
 
    if(path==="/admin/support/tickets"&&request.method==="GET"){
-    const rows=await env.DB.prepare("SELECT t.id,t.ticket_number,t.requester_user_id,t.subject,t.category,t.status,t.priority,t.created_at,t.updated_at,t.last_message_at,u.display_name AS requester_name,COUNT(m.id) AS message_count FROM support_tickets t JOIN app_users u ON u.id=t.requester_user_id LEFT JOIN support_ticket_messages m ON m.ticket_id=t.id GROUP BY t.id ORDER BY CASE t.status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'waiting_on_user' THEN 2 WHEN 'resolved' THEN 3 ELSE 4 END,t.last_message_at DESC LIMIT 1000").all();
-    return json({success:true,tickets:rows.results||[]},200,headers);
+    const params=new URL(request.url).searchParams;
+    const page=Math.max(1,Math.min(100000,Number(params.get("page"))||1));
+    const pageSize=Math.max(10,Math.min(50,Number(params.get("pageSize"))||25));
+    const status=clean(params.get("status")||"all",30);
+    const q=clean(params.get("q")||"",120);
+    const allowed=["all","open","in_progress","waiting_on_user","resolved","closed"];
+    if(!allowed.includes(status))return json({success:false,message:"Invalid ticket status filter."},400,headers);
+    const where=[],binds=[];
+    if(status!=="all"){where.push("t.status=?");binds.push(status)}
+    if(q){where.push("(t.ticket_number LIKE ? OR t.subject LIKE ? OR t.category LIKE ? OR u.display_name LIKE ?)");const like="%"+q+"%";binds.push(like,like,like,like)}
+    const clause=where.length?" WHERE "+where.join(" AND "):"";
+    const totalRow=await env.DB.prepare("SELECT COUNT(*) AS total FROM support_tickets t JOIN app_users u ON u.id=t.requester_user_id"+clause).bind(...binds).first();
+    const counts=await env.DB.prepare("SELECT status,COUNT(*) AS total FROM support_tickets GROUP BY status").all();
+    const offset=(page-1)*pageSize;
+    const rows=await env.DB.prepare("SELECT t.id,t.ticket_number,t.requester_user_id,t.subject,t.category,t.status,t.priority,t.created_at,t.updated_at,t.last_message_at,u.display_name AS requester_name,(SELECT COUNT(*) FROM support_ticket_messages m WHERE m.ticket_id=t.id) AS message_count FROM support_tickets t JOIN app_users u ON u.id=t.requester_user_id"+clause+" ORDER BY CASE t.status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'waiting_on_user' THEN 2 WHEN 'resolved' THEN 3 ELSE 4 END,t.last_message_at DESC LIMIT ? OFFSET ?").bind(...binds,pageSize,offset).all();
+    return json({success:true,tickets:rows.results||[],total:Number(totalRow?.total||0),page,pageSize,totalPages:Math.max(1,Math.ceil(Number(totalRow?.total||0)/pageSize)),counts:Object.fromEntries((counts.results||[]).map(x=>[x.status,Number(x.total)]))},200,headers);
    }
    const supportUpdate=path.match(/^\/admin\/support\/tickets\/([a-f0-9-]+)\/status$/);
    if(supportUpdate&&request.method==="POST"){

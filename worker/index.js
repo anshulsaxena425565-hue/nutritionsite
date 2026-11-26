@@ -367,8 +367,59 @@ export default {
     const rows=await env.DB.prepare("SELECT tool_key,enabled FROM platform_tool_controls").all();
     return json({success:true,settings:Object.fromEntries((rows.results||[]).map(r=>[r.tool_key,!!r.enabled]))},200,headers);
    }
+   if(path==="/support/tickets"&&request.method==="GET"){
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const rows=await env.DB.prepare("SELECT t.id,t.ticket_number,t.subject,t.category,t.status,t.priority,t.created_at,t.updated_at,t.last_message_at,COUNT(m.id) AS message_count FROM support_tickets t LEFT JOIN support_ticket_messages m ON m.ticket_id=t.id WHERE t.requester_user_id=? GROUP BY t.id ORDER BY t.last_message_at DESC LIMIT 100").bind(session.user_id).all();
+    return json({success:true,tickets:rows.results||[]},200,headers);
+   }
+   if(path==="/support/tickets"&&request.method==="POST"){
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const b=await body(request),subject=clean(b.subject,120),category=clean(b.category,60),message=clean(b.message,5000);
+    const allowed=["Account & access","Billing & subscription","Diet plan / nutrition tools","Technical issue","Other"];
+    if(subject.length<4||message.length<10||!allowed.includes(category))return json({success:false,message:"Add a clear subject, choose a category and describe the issue (at least 10 characters)."},400,headers);
+    const ticketId=id(),ticketNumber="PN-"+new Date().toISOString().slice(2,10).replaceAll("-","")+"-"+crypto.randomUUID().slice(0,6).toUpperCase(),stamp=now();
+    await env.DB.prepare("INSERT INTO support_tickets(id,ticket_number,requester_user_id,subject,category,status,priority,created_at,updated_at,last_message_at) VALUES(?,?,?,?,?,'open','normal',?,?,?)").bind(ticketId,ticketNumber,session.user_id,subject,category,stamp,stamp,stamp).run();
+    await env.DB.prepare("INSERT INTO support_ticket_messages(id,ticket_id,sender_user_id,sender_role,body,created_at) VALUES(?,?,?,'user',?,?)").bind(id(),ticketId,session.user_id,message,stamp).run();
+    await audit(env,session.user_id,null,"support.ticket.created","support_ticket",ticketId,{ticket_number:ticketNumber,category});
+    return json({success:true,message:"Support ticket created.",ticket:{id:ticketId,ticket_number:ticketNumber,subject,category,status:"open",priority:"normal",created_at:stamp,updated_at:stamp}},201,headers);
+   }
+   const supportMessages=path.match(/^\/support\/tickets\/([a-f0-9-]+)\/messages$/);
+   if(supportMessages&&(request.method==="GET"||request.method==="POST")){
+    if(!session)return json({success:false,message:"Sign in required."},401,headers);
+    const ticket=await env.DB.prepare("SELECT id,requester_user_id,status FROM support_tickets WHERE id=?").bind(supportMessages[1]).first();
+    if(!ticket)return json({success:false,message:"Support ticket not found."},404,headers);
+    if(ticket.requester_user_id!==session.user_id&&!session.is_platform_admin)return json({success:false,message:"You do not have access to this ticket."},403,headers);
+    if(request.method==="GET"){
+     const rows=await env.DB.prepare("SELECT m.id,m.sender_user_id,m.sender_role,m.body,m.created_at,u.display_name AS sender_name FROM support_ticket_messages m JOIN app_users u ON u.id=m.sender_user_id WHERE m.ticket_id=? ORDER BY m.created_at ASC LIMIT 500").bind(ticket.id).all();
+     return json({success:true,messages:rows.results||[]},200,headers);
+    }
+    const b=await body(request),message=clean(b.message,5000);
+    if(message.length<1)return json({success:false,message:"Write a message before sending."},400,headers);
+    if(ticket.status==="closed"&&!session.is_platform_admin)return json({success:false,message:"This ticket is closed. Create a new ticket if you need more help."},409,headers);
+    const stamp=now(),senderRole=session.is_platform_admin?"admin":"user",nextStatus=session.is_platform_admin?"waiting_on_user":"in_progress";
+    await env.DB.prepare("INSERT INTO support_ticket_messages(id,ticket_id,sender_user_id,sender_role,body,created_at) VALUES(?,?,?,?,?,?)").bind(id(),ticket.id,session.user_id,senderRole,message,stamp).run();
+    await env.DB.prepare("UPDATE support_tickets SET status=?,updated_at=?,last_message_at=? WHERE id=?").bind(nextStatus,stamp,stamp,ticket.id).run();
+    await audit(env,session.user_id,null,"support.ticket.message_sent","support_ticket",ticket.id,{sender_role:senderRole});
+    return json({success:true,message:"Reply sent.",status:nextStatus},201,headers);
+   }
    if(path.startsWith("/admin/")) {
     if(!session?.is_platform_admin) return json({success:false,message:"Platform administrator access required."},session?403:401,headers);
+
+   if(path==="/admin/support/tickets"&&request.method==="GET"){
+    const rows=await env.DB.prepare("SELECT t.id,t.ticket_number,t.requester_user_id,t.subject,t.category,t.status,t.priority,t.created_at,t.updated_at,t.last_message_at,u.display_name AS requester_name,COUNT(m.id) AS message_count FROM support_tickets t JOIN app_users u ON u.id=t.requester_user_id LEFT JOIN support_ticket_messages m ON m.ticket_id=t.id GROUP BY t.id ORDER BY CASE t.status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'waiting_on_user' THEN 2 WHEN 'resolved' THEN 3 ELSE 4 END,t.last_message_at DESC LIMIT 1000").all();
+    return json({success:true,tickets:rows.results||[]},200,headers);
+   }
+   const supportUpdate=path.match(/^\/admin\/support\/tickets\/([a-f0-9-]+)\/status$/);
+   if(supportUpdate&&request.method==="POST"){
+    const b=await body(request),status=clean(b.status,30),priority=clean(b.priority,20);
+    if(!["open","in_progress","waiting_on_user","resolved","closed"].includes(status)||!["low","normal","high","urgent"].includes(priority))return json({success:false,message:"Choose a valid ticket status and priority."},400,headers);
+    const ticket=await env.DB.prepare("SELECT id FROM support_tickets WHERE id=?").bind(supportUpdate[1]).first();
+    if(!ticket)return json({success:false,message:"Support ticket not found."},404,headers);
+    const stamp=now();await env.DB.prepare("UPDATE support_tickets SET status=?,priority=?,updated_at=? WHERE id=?").bind(status,priority,stamp,ticket.id).run();
+    await audit(env,session.user_id,null,"support.ticket.updated","support_ticket",ticket.id,{status,priority});
+    return json({success:true,message:"Ticket status and priority updated."},200,headers);
+   }
+
  
 
 

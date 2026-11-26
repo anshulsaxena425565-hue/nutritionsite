@@ -390,8 +390,12 @@ export default {
     if(!ticket)return json({success:false,message:"Support ticket not found."},404,headers);
     if(ticket.requester_user_id!==session.user_id&&!session.is_platform_admin)return json({success:false,message:"You do not have access to this ticket."},403,headers);
     if(request.method==="GET"){
-     const rows=await env.DB.prepare("SELECT m.id,m.sender_user_id,m.sender_role,m.body,m.created_at,u.display_name AS sender_name FROM support_ticket_messages m JOIN app_users u ON u.id=m.sender_user_id WHERE m.ticket_id=? ORDER BY m.created_at ASC LIMIT 500").bind(ticket.id).all();
-     return json({success:true,messages:rows.results||[]},200,headers);
+     const params=new URL(request.url).searchParams;
+     const page=Math.max(1,Math.min(100000,Number(params.get("page"))||1));
+     const pageSize=Math.max(10,Math.min(100,Number(params.get("pageSize"))||500));
+     const totalRow=await env.DB.prepare("SELECT COUNT(*) AS total FROM support_ticket_messages WHERE ticket_id=?").bind(ticket.id).first();
+     const rows=await env.DB.prepare("SELECT m.id,m.sender_user_id,m.sender_role,m.body,m.created_at,u.display_name AS sender_name FROM support_ticket_messages m JOIN app_users u ON u.id=m.sender_user_id WHERE m.ticket_id=? ORDER BY m.created_at DESC LIMIT ? OFFSET ?").bind(ticket.id,pageSize,(page-1)*pageSize).all();
+     return json({success:true,messages:(rows.results||[]).reverse(),total:Number(totalRow?.total||0),page,pageSize,totalPages:Math.max(1,Math.ceil(Number(totalRow?.total||0)/pageSize))},200,headers);
     }
     const b=await body(request),message=clean(b.message,5000);
     if(message.length<1)return json({success:false,message:"Write a message before sending."},400,headers);
